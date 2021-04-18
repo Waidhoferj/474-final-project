@@ -65,6 +65,13 @@ public:
 		glm::mat4 T = glm::translate(glm::mat4(1), pos);
 		return R * T;
 	}
+
+	void lookAt(glm::vec3 point)
+	{
+		glm::vec3 direction = normalize(point - pos);
+		rot.x = acos(dot(vec3(direction.x, 0, 0), vec3(1, 0, 0)));
+		rot.y = acos(dot(vec3(0, direction.y, 0), vec3(0, 1, 0)));
+	}
 };
 
 camera mycam;
@@ -321,21 +328,49 @@ public:
 		glUseProgram(prog->pid);
 		glUniform1i(Tex1Location, 0);
 		glUniform1i(Tex2Location, 1);
-
+		float rad = 3.0;
+		float z_dist = -6;
 		// Initialize the maneuver path
 		smoothrender.init();
 		linerender.init();
-		line.push_back(vec3(0, -0.5, -3));
+		line.push_back(vec3(0, 1, z_dist));
+		line.push_back(vec3(0, 0, z_dist += 3));
+		line.push_back(vec3(0, -1, z_dist += 6));
+		// Dive down
+		line.push_back(vec3(0, -rad, z_dist += 5));
 
-		for (int i = 2; i < 12; i++)
-		{
-			double sway = 0.6;
-			line.push_back(vec3(i % 2 ? -sway : sway, -0.5, i * -6));
-		}
+		//climb up and to the right
+		line.push_back(vec3(rad, 0, z_dist += 5));
+
+		// top out
+		line.push_back(vec3(0, rad, z_dist += 5));
+
+		// down to 270º
+		line.push_back(vec3(-rad, 0, z_dist += 5));
+
+		// bottom out
+		line.push_back(vec3(0, -rad, z_dist += 5));
+
+		//exit
+		line.push_back(vec3(0, -rad / 2, z_dist += 6));
+		line.push_back(vec3(0, 0, z_dist += 6));
+
 		linerender.re_init_line(line);
-		spline(splinepoints, line, 200, 1.0);
+		spline(splinepoints, line, 200, 2);
 
 		// Initialize the maneuver angles
+		vec3 maneuver_axis = vec3(0, 1, 0);
+		mat4 upside_down = rotate(mat4(1.0), 180.0f, maneuver_axis);
+		mat4 bank_right = rotate(mat4(1.0), -90.0f, maneuver_axis);
+		mat4 bank_left = rotate(mat4(1.0), 90.0f, maneuver_axis);
+		mat4 level = rotate(mat4(1.0), 0.0f, maneuver_axis);
+		for (int i = 0; i < 4; i++)
+			Marr.push_back(level);
+		Marr.push_back(bank_right);
+		Marr.push_back(upside_down);
+		Marr.push_back(bank_left);
+		for (int i = 0; i < 4; i++)
+			Marr.push_back(level);
 	}
 
 	//General OGL initialization - set OGL state here
@@ -472,19 +507,27 @@ public:
 		double angle_max = 3.14159 / 4.0;
 		double bank_angle = (1 - extrema_interp) * sign * angle_max + extrema_interp * sign * -angle_max;
 
-		// -45 -> 45
 		// Move camera
-		double z_offset = 3.0;
-		mycam.pos = vec3(0, 0, -z_offset) * path_t - (splinepoints[splinepoints.size() - 1] + vec3(0, 0, z_offset)) * path_t;
-
+		// Starting position
+		double z_offset = 10.0;
+		mycam.pos = -(vec3(0, 0, z_offset) * (1 - path_t) + (splinepoints[splinepoints.size() - 1] + vec3(0, 0, z_offset)) * path_t);
+		// mycam.lookAt(position);
 		// Draw the plane using GLSL.
 		glm::mat4 TransPlane = glm::translate(glm::mat4(1.0f), position);
 		glm::mat4 SPlane = glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 2.0f));
 		sangle = -3.1415926 / 2.;
 		glm::mat4 Rotation = glm::mat4(0.0);
 		glm::mat4 RotateXPlane = glm::rotate(glm::mat4(1.0f), sangle, vec3(1, 0, 0));
-		glm::mat4 RotateYPlane = glm::rotate(glm::mat4(1.0f), (float)bank_angle, vec3(0, 1, 0));
 		glm::mat4 RotateZPlane = glm::rotate(glm::mat4(1.0f), 3.1415926f, vec3(0, 0, 1));
+		// Do a barrel roll!
+		float roll_t = path_t * (Marr.size() - 2);
+		int roll_i = int(roll_t);
+		float roll_interp = roll_t - roll_i;
+		quat last_angle = quat(Marr[roll_i]);
+		quat next_angle = quat(Marr[roll_i + 1]);
+		quat cur_angle_quat = slerp(last_angle, next_angle, roll_interp);
+		mat4 RotateYPlane = mat4(cur_angle_quat);
+
 		// hint:
 		vec3 Z = normalize(next_point - position);
 		vec3 Y = vec3(0, 1.0, 0);
