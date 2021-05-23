@@ -14,7 +14,7 @@
  * Written by Ian Dunn, 9/24/2017
  */
 
-#pragma  once
+#pragma once
 
 #ifndef LAB471_WINDOW_H_INCLUDED
 #define LAB471_WINDOW_H_INCLUDED
@@ -22,21 +22,18 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-
 // This interface let's us write our own class that can be notified by input
 // events, such as key presses and mouse movement.
 class EventCallbacks
 {
 
 public:
-
-
 	virtual void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) = 0;
 
 	virtual void mouseCallback(GLFWwindow *window, int button, int action, int mods) = 0;
 
 	virtual void resizeCallback(GLFWwindow *window, int in_width, int in_height) = 0;
-
+	virtual void mouseMoveCallback(GLFWwindow *window, double xpos, double ypos) = 0;
 };
 
 // This class is responsible for all window management code, i.e. GLFW3 code
@@ -45,13 +42,12 @@ class WindowManager
 {
 
 public:
-
 	WindowManager();
 	~WindowManager();
 
 	// Go ahead and ignore these two lines :-) for now
-	WindowManager(const WindowManager&) = delete;
-	WindowManager& operator= (const WindowManager&) = delete;
+	WindowManager(const WindowManager &) = delete;
+	WindowManager &operator=(const WindowManager &) = delete;
 
 	bool init(int const width, int const height);
 	void shutdown();
@@ -61,15 +57,13 @@ public:
 	GLFWwindow *getHandle();
 
 protected:
-
 	// This class implements the singleton design pattern
-	static WindowManager * instance;
+	static WindowManager *instance;
 
 	GLFWwindow *windowHandle = nullptr;
 	EventCallbacks *callbacks = nullptr;
 
 private:
-
 	// What are these?!
 	//
 	// GLFW3 expects C-style callbacks, but we want to be able to use C++-style
@@ -79,7 +73,7 @@ private:
 	static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
 	static void mouse_callback(GLFWwindow *window, int button, int action, int mods);
 	static void resize_callback(GLFWwindow *window, int in_width, int in_height);
-
+	static void mouse_move_callback(GLFWwindow *window, double xpos, double ypos);
 };
 
 #endif

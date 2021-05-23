@@ -4,13 +4,12 @@
 
 #include <iostream>
 
-
 void error_callback(int error, const char *description)
 {
 	std::cerr << description << std::endl;
 }
 
-WindowManager * WindowManager::instance = nullptr;
+WindowManager *WindowManager::instance = nullptr;
 
 WindowManager::WindowManager()
 {
@@ -48,7 +47,7 @@ bool WindowManager::init(int const width, int const height)
 
 	// Create a windowed mode window and its OpenGL context.
 	windowHandle = glfwCreateWindow(width, height, "hello triangle", nullptr, nullptr);
-	if (! windowHandle)
+	if (!windowHandle)
 	{
 		glfwTerminate();
 		return false;
@@ -72,6 +71,7 @@ bool WindowManager::init(int const width, int const height)
 	glfwSetKeyCallback(windowHandle, key_callback);
 	glfwSetMouseButtonCallback(windowHandle, mouse_callback);
 	glfwSetFramebufferSizeCallback(windowHandle, resize_callback);
+	glfwSetCursorPosCallback(windowHandle, mouse_move_callback);
 
 	return true;
 }
@@ -82,17 +82,17 @@ void WindowManager::shutdown()
 	glfwTerminate();
 }
 
-void WindowManager::setEventCallbacks(EventCallbacks * callbacks_in)
+void WindowManager::setEventCallbacks(EventCallbacks *callbacks_in)
 {
 	callbacks = callbacks_in;
 }
 
-GLFWwindow * WindowManager::getHandle()
+GLFWwindow *WindowManager::getHandle()
 {
 	return windowHandle;
 }
 
-void WindowManager::key_callback(GLFWwindow * window, int key, int scancode, int action, int mods)
+void WindowManager::key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
 	if (instance && instance->callbacks)
 	{
@@ -100,7 +100,7 @@ void WindowManager::key_callback(GLFWwindow * window, int key, int scancode, int
 	}
 }
 
-void WindowManager::mouse_callback(GLFWwindow * window, int button, int action, int mods)
+void WindowManager::mouse_callback(GLFWwindow *window, int button, int action, int mods)
 {
 	if (instance && instance->callbacks)
 	{
@@ -108,10 +108,19 @@ void WindowManager::mouse_callback(GLFWwindow * window, int button, int action, 
 	}
 }
 
-void WindowManager::resize_callback(GLFWwindow * window, int in_width, int in_height)
+void WindowManager::resize_callback(GLFWwindow *window, int in_width, int in_height)
 {
 	if (instance && instance->callbacks)
 	{
 		instance->callbacks->resizeCallback(window, in_width, in_height);
 	}
 }
+
+void WindowManager::mouse_move_callback(GLFWwindow *window, double xpos, double ypos)
+{
+	if (instance && instance->callbacks)
+	{
+		instance->callbacks->mouseMoveCallback(window, xpos, ypos);
+	}
+}
+

@@ -15,6 +15,7 @@ based on CPE/CSC 471 Lab base code Wood/Dunn/Eckhardt
 #include "WindowManager.h"
 #include "Shape.h"
 #include "line.h"
+#include "SpaceGame.h"
 // value_ptr for glm
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -22,6 +23,8 @@ using namespace std;
 using namespace glm;
 shared_ptr<Shape> shape;
 shared_ptr<Shape> plane;
+
+vec2 mousePos;
 
 double get_last_elapsed_time()
 {
@@ -156,6 +159,17 @@ public:
 		}
 	}
 
+	void mouseMoveCallback(GLFWwindow *window, double xpos, double ypos)
+	{
+		//get the window size - may be different then pixels for retina
+		int width, height;
+		double posX, posY;
+		glfwGetWindowSize(window, &width, &height);
+		glfwGetCursorPos(window, &posX, &posY);
+		mousePos.x = posX / (double)width;
+		mousePos.y = posY / (double)height;
+	}
+
 	// callback for the mouse when clicked move the triangle when helper functions
 	// written
 	void mouseCallback(GLFWwindow *window, int button, int action, int mods)
@@ -200,8 +214,8 @@ public:
 		shape->init();
 
 		plane = make_shared<Shape>();
-		string mtldir = resourceDirectory + "/FA-18E_SuperHornet/";
-		plane->loadMesh(resourceDirectory + "/FA-18E_SuperHornet/FA-18E_SuperHornet.obj", &mtldir, stbi_load);
+		string mtldir = resourceDirectory + "/Viper-mk-IV-fighter/";
+		plane->loadMesh(resourceDirectory + "/Viper-mk-IV-fighter/Viper-mk-IV-fighter.obj", &mtldir, stbi_load);
 
 		plane->resize();
 		plane->init();
@@ -444,9 +458,6 @@ public:
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		double frametime = get_last_elapsed_time();
 		total_time += frametime;
-		double anim_time = total_time * splinepoints.size() / 10.0;
-		int anim_step = (int)anim_time;
-		double interp_t = anim_time - (double)anim_step;
 
 		// Get current frame buffer size.
 		int width, height;
@@ -460,7 +471,7 @@ public:
 		// Create the matrix stacks - please leave these alone for now
 
 		glm::mat4 V, M, P; //View, Model and Perspective matrix
-		V = mycam.process(frametime);
+
 		M = glm::mat4(1);
 		// Apply orthographic projection....
 		P = glm::ortho(-1 * aspect, 1 * aspect, -1.0f, 1.0f, -2.0f, 100.0f);
@@ -472,7 +483,7 @@ public:
 		P = glm::perspective((float)(3.14159 / 4.), (float)((float)width / (float)height), 0.1f, 1000.0f); //so much type casting... GLM metods are quite funny ones
 		float sangle = 3.1415926 / 2.;
 		glm::mat4 RotateXSky = glm::rotate(glm::mat4(1.0f), sangle, glm::vec3(1.0f, 0.0f, 0.0f));
-		glm::vec3 camp = -mycam.pos;
+		glm::vec3 camp = vec3(0, 0, 0);
 		glm::mat4 TransSky = glm::translate(glm::mat4(1.0f), camp);
 		glm::mat4 SSky = glm::scale(glm::mat4(1.0f), glm::vec3(0.8f, 0.8f, 0.8f));
 
@@ -491,65 +502,28 @@ public:
 		glEnable(GL_DEPTH_TEST);
 		psky->unbind();
 
-		// Interpolate along path
-		int point_index = anim_step % (splinepoints.size() - 1);
-
-		vec3 cur_point = splinepoints[point_index];
-		vec3 next_point = splinepoints[point_index + 1];
-		vec3 position = cur_point * glm::vec3(1.0 - interp_t) + next_point * glm::vec3(interp_t);
-
-		float path_t = ((float)point_index / (float)(splinepoints.size() - 1));
-		// Interp angle
-		double extrema_time = ((double)(line.size() - 1) * path_t);
-		int extrema_index = (int)extrema_time;
-		double extrema_interp = extrema_time - (double)extrema_index;
-		double sign = line[extrema_index].x < line[extrema_index + 1].x ? -1 : 1;
-		double angle_max = 3.14159 / 4.0;
-		double bank_angle = (1 - extrema_interp) * sign * angle_max + extrema_interp * sign * -angle_max;
-
-		// Move camera
-		// Starting position
-		double z_offset = 10.0;
-		mycam.pos = -(vec3(0, 0, z_offset) * (1 - path_t) + (splinepoints[splinepoints.size() - 1] + vec3(0, 0, z_offset)) * path_t);
-		// mycam.lookAt(position);
+		mycam.pos = vec3(0, 8, -8);
+		V = glm::lookAt(mycam.pos, vec3(0, 0, 0), vec3(0, 1, 0));
 		// Draw the plane using GLSL.
-		glm::mat4 TransPlane = glm::translate(glm::mat4(1.0f), position);
-		glm::mat4 SPlane = glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 2.0f));
-		sangle = -3.1415926 / 2.;
-		glm::mat4 Rotation = glm::mat4(0.0);
-		glm::mat4 RotateXPlane = glm::rotate(glm::mat4(1.0f), sangle, vec3(1, 0, 0));
-		glm::mat4 RotateZPlane = glm::rotate(glm::mat4(1.0f), 3.1415926f, vec3(0, 0, 1));
-		// Do a barrel roll!
-		float roll_t = path_t * (Marr.size() - 2);
-		int roll_i = int(roll_t);
-		float roll_interp = roll_t - roll_i;
-		quat last_angle = quat(Marr[roll_i]);
-		quat next_angle = quat(Marr[roll_i + 1]);
-		quat cur_angle_quat = slerp(last_angle, next_angle, roll_interp);
-		mat4 RotateYPlane = mat4(cur_angle_quat);
+		static PlayerShip ship;
 
-		// hint:
-		vec3 Z = normalize(next_point - position);
-		vec3 Y = vec3(0, 1.0, 0);
-		vec3 X = normalize(cross(Y, Z));
-		Rotation[0][0] = X.x;
-		Rotation[0][1] = X.y;
-		Rotation[0][2] = X.z;
-		Rotation[0][3] = 0;
-		Rotation[1][0] = Y.x;
-		Rotation[1][1] = Y.y;
-		Rotation[1][2] = Y.z;
-		Rotation[1][3] = 0;
-		Rotation[2][0] = Z.x;
-		Rotation[2][1] = Z.y;
-		Rotation[2][2] = Z.z;
-		Rotation[2][3] = 0;
-		Rotation[3][0] = 0;
-		Rotation[3][1] = 0;
-		Rotation[3][2] = 0;
-		Rotation[3][3] = 1.0f;
+		glm::mat4 TransPlane = glm::translate(glm::mat4(1.0f), vec3(0, 0, 0));
+		glm::mat4 SPlane = glm::scale(glm::mat4(1.0f), glm::vec3(0.5));
+		ship.update(mousePos);
+		// vec2 mouseDif = mousePos - vec2(0.5);
+		// double spdFact = abs(glm::min(glm::length(mouseDif * vec2(2)), 1.0f));
+		// static double smoothSpdFact = 0.0;
+		// smoothSpdFact += (spdFact - smoothSpdFact) * 0.5;
+		// double shipDir = atan2(-mouseDif.y, mouseDif.x);
+		// static double smoothDir = 0.0;
+		// smoothDir += (shipDir - smoothDir) * 0.07;
+		// vec3 spd = vec3(0.2);
+		// static vec3 shipPos = vec3(0.0);
+		// shipPos += vec3(cos(smoothDir), 0, -sin(smoothDir)) * spd * vec3(smoothSpdFact);
 
-		M = TransPlane * Rotation * RotateXPlane * RotateYPlane * RotateZPlane;
+		glm::mat4 Rot = glm::rotate(mat4(1.0), (float)ship.angle, vec3(0, 1, 0));
+
+		M = TransPlane * SPlane * Rot;
 
 		pplane->bind();
 		glUniformMatrix4fv(pplane->getUniform("P"), 1, GL_FALSE, &P[0][0]);
@@ -561,12 +535,33 @@ public:
 		plane->draw(pplane); //render!!!!!!!
 		pplane->unbind();
 
+		Planet planets[] = {
+			Planet(),
+			Planet(),
+			Planet(),
+		};
+
+		for (int i = 0; i < 3; i++)
+		{
+			M = glm::translate(mat4(1.0), ship.pos - planets[i].pos) * SPlane * Rot;
+
+			pplane->bind();
+			glUniformMatrix4fv(pplane->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+			glUniformMatrix4fv(pplane->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+			glUniformMatrix4fv(pplane->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+			glUniform3fv(pplane->getUniform("campos"), 1, &mycam.pos[0]);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, Texture2);
+			shape->draw(pplane); //render!!!!!!!
+			pplane->unbind();
+		}
+
 		//draw the lines
 
-		glm::vec3 linecolor = glm::vec3(1, 0, 0);
-		linerender.draw(P, V, linecolor);
-		linecolor = glm::vec3(0, 1, 1);
-		smoothrender.draw(P, V, linecolor);
+		// glm::vec3 linecolor = glm::vec3(1, 0, 0);
+		// linerender.draw(P, V, linecolor);
+		// linecolor = glm::vec3(0, 1, 1);
+		// smoothrender.draw(P, V, linecolor);
 	}
 };
 //******************************************************************************************
