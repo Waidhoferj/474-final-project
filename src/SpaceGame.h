@@ -10,6 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "Shape.h"
 #include "line.h"
+#include "Program.h"
 
 using namespace glm;
 using namespace std;
@@ -65,6 +66,7 @@ public:
     void updatePos(vec2 mousePos);
     bool intersects(Asteroid &asteroid);
     bool intersects(Planet &planet);
+    void respawn();
 };
 
 #endif // LAB471_SHAPE_H_INCLUDED

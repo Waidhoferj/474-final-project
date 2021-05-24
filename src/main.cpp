@@ -92,7 +92,7 @@ public:
 	WindowManager *windowManager = nullptr;
 
 	// Our shader program
-	std::shared_ptr<Program> prog, psky, pShip;
+	std::shared_ptr<Program> prog, pTile, psky, pShip;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID;
@@ -103,6 +103,7 @@ public:
 	//texture data
 	GLuint Texture;
 	GLuint Texture2;
+	GLuint Texture3;
 
 	double total_time = 0.0;
 
@@ -377,15 +378,30 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		glGenerateMipmap(GL_TEXTURE_2D);
+		//texture3
+		str = resourceDirectory + "/delivered.png";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &Texture3);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, Texture3);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
 
 		//[TWOTEXTURES]
 		//set the 2 textures to the correct samplers in the fragment shader:
 		GLuint Tex1Location = glGetUniformLocation(prog->pid, "tex"); //tex, tex2... sampler in the fragment shader
 		GLuint Tex2Location = glGetUniformLocation(prog->pid, "tex2");
+		GLuint Tex3Location = glGetUniformLocation(prog->pid, "tex3");
 		// Then bind the uniform samplers to texture units:
 		glUseProgram(prog->pid);
 		glUniform1i(Tex1Location, 0);
 		glUniform1i(Tex2Location, 1);
+		glUniform1i(Tex3Location, 2);
 		float rad = 3.0;
 		float z_dist = -6;
 		// Initialize the maneuver path
@@ -457,6 +473,25 @@ public:
 		prog->addAttribute("vertPos");
 		prog->addAttribute("vertNor");
 		prog->addAttribute("vertTex");
+
+		pTile = std::make_shared<Program>();
+		pTile->setVerbose(true);
+		pTile->setShaderNames(resourceDirectory + "/tile_vertex.glsl", resourceDirectory + "/tile_fragment.glsl");
+		if (!pTile->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		pTile->addUniform("P");
+		pTile->addUniform("V");
+		pTile->addUniform("M");
+		pTile->addUniform("tile_offset");
+		pTile->addUniform("prev_offset");
+		pTile->addUniform("t");
+		pTile->addUniform("campos");
+		pTile->addAttribute("vertPos");
+		pTile->addAttribute("vertNor");
+		pTile->addAttribute("vertTex");
 
 		psky = std::make_shared<Program>();
 		psky->setVerbose(true);
@@ -567,18 +602,52 @@ public:
 		glBindTexture(GL_TEXTURE_2D, Texture2);
 		shipMesh->draw(pShip); //render!!!!!!!
 		pShip->unbind();
-		if (false)
+		if (ship.state == Exploding)
 		{
-			prog->bind();
-			M = mat4(1.0);
-			glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, &P[0][0]);
-			glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-			glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, Texture2);
-			plane->draw(prog);
-			prog->unbind();
+			double duration = 0.7;
+			static double exp_time = 0;
+			if (exp_time > duration)
+			{
+				ship.respawn();
+				exp_time = 0.0;
+			}
+			else
+			{
+				pTile->bind();
+				static vec2 offset = vec2(0.0, 0.0);
+				double anim_time = (total_time / duration * 16.0);
+				int frame_num = (int)anim_time;
+				double t = anim_time - (double)frame_num;
+				offset.x = (frame_num % 4);
+				offset.y = frame_num / 4;
+				static vec2 prev_offset = vec2(0.0, 0.0);
+				prev_offset.x = (frame_num - 1) % 4;
+				prev_offset.y = (frame_num - 1) / 4;
+				glUniform2f(pTile->getUniform("tile_offset"), offset.x / 4.0, offset.y / 4.0);
+				glUniform2f(pTile->getUniform("prev_offset"), prev_offset.x / 4.0, prev_offset.y / 4.0);
+				glUniform1f(pTile->getUniform("t"), t);
+				M = glm::translate(mat4(1.0), vec3(0, 0.7, 0)) * glm::lookAt(vec3(0), mycam.pos, vec3(0, 1, 0));
+				glUniformMatrix4fv(pTile->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+				glUniformMatrix4fv(pTile->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+				glUniformMatrix4fv(pTile->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_2D, Texture);
+				plane->draw(pTile);
+				pTile->unbind();
+
+				exp_time += frametime;
+			}
 		}
+
+		prog->bind();
+		M = glm::translate(mat4(1.0), vec3(0, 0.7, 1)) * glm::lookAt(vec3(0), mycam.pos, vec3(0, 1, 0)) * glm::scale(mat4(1), vec3(0.7));
+		glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+		glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, Texture3);
+		plane->draw(prog);
+		prog->unbind();
 
 		for (auto &planet : planets)
 		{
@@ -586,7 +655,7 @@ public:
 			M = glm::translate(mat4(1.0), ship.pos - planet.pos) * glm::scale(mat4(1), vec3(planet.scale)) * planet.rotMat;
 			if (ship.intersects(planet))
 			{
-				ship.pos = vec3(0);
+				ship.state = Exploding;
 			}
 
 			pShip->bind();
@@ -606,7 +675,7 @@ public:
 			M = glm::translate(mat4(1.0), ship.pos - asteroid.pos) * glm::scale(mat4(1), vec3(asteroid.scale)) * glm::rotate(mat4(1.0), (float)(total_time * asteroid.rotScalar), vec3(0, 1, 0));
 			if (ship.intersects(asteroid))
 			{
-				ship.pos = vec3(0);
+				ship.state = Exploding;
 			}
 
 			pShip->bind();

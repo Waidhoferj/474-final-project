@@ -36,6 +36,13 @@ bool PlayerShip::intersects(Planet &planet)
     return glm::length(glm::distance(planet.pos, pos)) <= planet.scale + scale;
 }
 
+void PlayerShip::respawn()
+{
+    points = 0;
+    pos = vec3(0);
+    state = Delivering;
+}
+
 Planet::Planet()
 {
     float rand_axis = (float)rand() / RAND_MAX * (float)acos(0) / 4.0f;
