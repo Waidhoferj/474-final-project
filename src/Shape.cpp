@@ -8,7 +8,6 @@
 
 using namespace std;
 
-
 void Shape::loadMesh(const string &meshName, string *mtlpath, unsigned char *(loadimage)(char const *, int *, int *, int *, int))
 {
 	// Load geometry
@@ -18,17 +17,16 @@ void Shape::loadMesh(const string &meshName, string *mtlpath, unsigned char *(lo
 	vector<tinyobj::material_t> objMaterials;
 	string errStr;
 	bool rc = false;
-	if(mtlpath)
+	if (mtlpath)
 		rc = tinyobj::LoadObj(shapes, objMaterials, errStr, meshName.c_str(), mtlpath->c_str());
 	else
 		rc = tinyobj::LoadObj(shapes, objMaterials, errStr, meshName.c_str());
 
-	
-	if (! rc)
+	if (!rc)
 	{
 		cerr << errStr << endl;
 	}
-	else if(shapes.size())
+	else if (shapes.size())
 	{
 		obj_count = shapes.size();
 		posBuf = new std::vector<float>[shapes.size()];
@@ -44,26 +42,25 @@ void Shape::loadMesh(const string &meshName, string *mtlpath, unsigned char *(lo
 		materialIDs = new unsigned int[shapes.size()];
 
 		textureIDs = new unsigned int[shapes.size()];
-		
+
 		for (int i = 0; i < obj_count; i++)
 		{
 			//load textures
 			textureIDs[i] = 0;
-			//texture sky			
+			//texture sky
 			posBuf[i] = shapes[i].mesh.positions;
 			norBuf[i] = shapes[i].mesh.normals;
 			texBuf[i] = shapes[i].mesh.texcoords;
 			eleBuf[i] = shapes[i].mesh.indices;
-			if(shapes[i].mesh.material_ids.size()>0)
+			if (shapes[i].mesh.material_ids.size() > 0)
 				materialIDs[i] = shapes[i].mesh.material_ids[0];
 			else
 				materialIDs[i] = -1;
-
 		}
 	}
 	//material:
 	for (int i = 0; i < objMaterials.size(); i++)
-		if (objMaterials[i].diffuse_texname.size()>0)
+		if (objMaterials[i].diffuse_texname.size() > 0)
 		{
 			char filepath[1000];
 			int width, height, channels;
@@ -75,7 +72,7 @@ void Shape::loadMesh(const string &meshName, string *mtlpath, unsigned char *(lo
 			strcpy(filepath, str.c_str());
 			//stbi_load(char const *filename, int *x, int *y, int *comp, int req_comp)
 
-			unsigned char* data = loadimage(filepath, &width, &height, &channels, 4);
+			unsigned char *data = loadimage(filepath, &width, &height, &channels, 4);
 			glGenTextures(1, &textureIDs[i]);
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, textureIDs[i]);
@@ -105,23 +102,29 @@ void Shape::resize()
 
 	// Go through all vertices to determine min and max of each dimension
 	for (int i = 0; i < obj_count; i++)
-	for (size_t v = 0; v < posBuf[i].size() / 3; v++)
-	{
-		if (posBuf[i][3*v+0] < minX) minX = posBuf[i][3*v+0];
-		if (posBuf[i][3*v+0] > maxX) maxX = posBuf[i][3*v+0];
+		for (size_t v = 0; v < posBuf[i].size() / 3; v++)
+		{
+			if (posBuf[i][3 * v + 0] < minX)
+				minX = posBuf[i][3 * v + 0];
+			if (posBuf[i][3 * v + 0] > maxX)
+				maxX = posBuf[i][3 * v + 0];
 
-		if (posBuf[i][3*v+1] < minY) minY = posBuf[i][3*v+1];
-		if (posBuf[i][3*v+1] > maxY) maxY = posBuf[i][3*v+1];
+			if (posBuf[i][3 * v + 1] < minY)
+				minY = posBuf[i][3 * v + 1];
+			if (posBuf[i][3 * v + 1] > maxY)
+				maxY = posBuf[i][3 * v + 1];
 
-		if (posBuf[i][3*v+2] < minZ) minZ = posBuf[i][3*v+2];
-		if (posBuf[i][3*v+2] > maxZ) maxZ = posBuf[i][3*v+2];
-	}
+			if (posBuf[i][3 * v + 2] < minZ)
+				minZ = posBuf[i][3 * v + 2];
+			if (posBuf[i][3 * v + 2] > maxZ)
+				maxZ = posBuf[i][3 * v + 2];
+		}
 
 	// From min and max compute necessary scale and shift for each dimension
 	float maxExtent, xExtent, yExtent, zExtent;
-	xExtent = maxX-minX;
-	yExtent = maxY-minY;
-	zExtent = maxZ-minZ;
+	xExtent = maxX - minX;
+	yExtent = maxY - minY;
+	zExtent = maxZ - minZ;
 	if (xExtent >= yExtent && xExtent >= zExtent)
 	{
 		maxExtent = xExtent;
@@ -162,7 +165,6 @@ void Shape::init()
 	for (int i = 0; i < obj_count; i++)
 
 	{
-
 
 		// Initialize the vertex array object
 		glGenVertexArrays(1, &vaoID[i]);
@@ -250,9 +252,9 @@ void Shape::draw(const shared_ptr<Program> prog) const
 
 		//texture
 		glActiveTexture(GL_TEXTURE0);
-		
+
 		int textureindex = materialIDs[i];
-		if(textureindex>=0)
+		if (textureindex >= 0)
 			glBindTexture(GL_TEXTURE_2D, textureIDs[textureindex]);
 
 		// Draw

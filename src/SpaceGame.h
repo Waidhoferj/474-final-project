@@ -17,31 +17,54 @@ using namespace std;
 class Planet
 {
 public:
+    Planet(vec3 position);
+    Planet();
+    static Shape shape;
     vec3 pos;
     quat rot_axis;
-    double rotation;
     double scale;
-    shared_ptr<Shape> shape;
+    mat4 rotMat;
     void update(double time);
 };
 
 class Asteroid
 {
 public:
+    Asteroid();
     vec3 pos;
     quat rot_axis;
-    double rotation;
+    double rotScalar;
+    double speedScalar;
     double scale;
     vector<vec3> path;
-    shared_ptr<Shape> shape;
+    static Shape shape;
+
+    void setPath(vector<vec3> points);
+    void update(double time);
+};
+
+enum ShipState
+{
+    Flying,
+    Delivering,
+    Exploding
 };
 
 class PlayerShip
 {
 public:
+    static Shape shape;
+    ShipState state = Delivering;
+    static vector<vec3> bounds;
     vec3 pos;
+    double scale = 0.5;
     double angle;
-    void update(vec2 mousePos);
+    int points;
+    double time_left;
+    void update(vec2 mousePos, double dt);
+    void updatePos(vec2 mousePos);
+    bool intersects(Asteroid &asteroid);
+    bool intersects(Planet &planet);
 };
 
 #endif // LAB471_SHAPE_H_INCLUDED

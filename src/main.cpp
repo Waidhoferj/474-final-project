@@ -21,8 +21,14 @@ based on CPE/CSC 471 Lab base code Wood/Dunn/Eckhardt
 #include <glm/gtc/matrix_transform.hpp>
 using namespace std;
 using namespace glm;
-shared_ptr<Shape> shape;
+shared_ptr<Shape> sphere;
 shared_ptr<Shape> plane;
+shared_ptr<Shape> shipMesh;
+shared_ptr<Shape> asteroidMesh;
+shared_ptr<Shape> ufoMesh;
+
+vector<Planet> planets;
+vector<Asteroid> asteroids;
 
 vec2 mousePos;
 
@@ -86,7 +92,7 @@ public:
 	WindowManager *windowManager = nullptr;
 
 	// Our shader program
-	std::shared_ptr<Program> prog, psky, pplane;
+	std::shared_ptr<Program> prog, psky, pShip;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID;
@@ -208,17 +214,55 @@ public:
 	{
 
 		// Initialize mesh.
-		shape = make_shared<Shape>();
-		shape->loadMesh(resourceDirectory + "/sphere.obj");
-		shape->resize();
-		shape->init();
+		sphere = make_shared<Shape>();
+		sphere->loadMesh(resourceDirectory + "/sphere.obj");
+		sphere->resize();
+		sphere->init();
 
 		plane = make_shared<Shape>();
-		string mtldir = resourceDirectory + "/Viper-mk-IV-fighter/";
-		plane->loadMesh(resourceDirectory + "/Viper-mk-IV-fighter/Viper-mk-IV-fighter.obj", &mtldir, stbi_load);
-
+		plane->loadMesh(resourceDirectory + "/plane.obj");
 		plane->resize();
 		plane->init();
+
+		planets.push_back(Planet(vec3(0, 0, 20)));
+		planets.push_back(Planet(vec3(5, 0, 15)));
+		planets.push_back(Planet(vec3(3, 0, 4)));
+
+		asteroidMesh = make_shared<Shape>();
+		asteroidMesh->loadMesh(resourceDirectory + "/asteroid.obj");
+		asteroidMesh->resize();
+		asteroidMesh->init();
+
+		vector<vec3> line;
+
+		for (auto &planet : planets)
+		{
+			for (int i = 0; i < 5; i++)
+			{
+				line.push_back(vec3(1, 0, 0));
+				line.push_back(vec3(0, 0, 1));
+				line.push_back(vec3(-1, 0, 0));
+				line.push_back(vec3(0, 0, -1));
+				line.push_back(vec3(1, 0, 0));
+			}
+
+			for (auto &point : line)
+			{
+				float r = (float)rand() / RAND_MAX;
+				point = point * vec3(1.5 * planet.scale + r * 1.5) + planet.pos;
+			}
+			Asteroid a;
+			a.setPath(line);
+			asteroids.push_back(a);
+			line.clear();
+		}
+
+		shipMesh = make_shared<Shape>();
+		string mtldir = resourceDirectory + "/Viper-mk-IV-fighter/";
+		shipMesh->loadMesh(resourceDirectory + "/Viper-mk-IV-fighter/Viper-mk-IV-fighter.obj", &mtldir, stbi_load);
+
+		shipMesh->resize();
+		shipMesh->init();
 
 		//generate the VAO
 		glGenVertexArrays(1, &VertexArrayID);
@@ -430,21 +474,21 @@ public:
 		psky->addAttribute("vertNor");
 		psky->addAttribute("vertTex");
 
-		pplane = std::make_shared<Program>();
-		pplane->setVerbose(true);
-		pplane->setShaderNames(resourceDirectory + "/plane_vertex.glsl", resourceDirectory + "/plane_frag.glsl");
-		if (!pplane->init())
+		pShip = std::make_shared<Program>();
+		pShip->setVerbose(true);
+		pShip->setShaderNames(resourceDirectory + "/plane_vertex.glsl", resourceDirectory + "/plane_frag.glsl");
+		if (!pShip->init())
 		{
 			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
 			exit(1);
 		}
-		pplane->addUniform("P");
-		pplane->addUniform("V");
-		pplane->addUniform("M");
-		pplane->addUniform("campos");
-		pplane->addAttribute("vertPos");
-		pplane->addAttribute("vertNor");
-		pplane->addAttribute("vertTex");
+		pShip->addUniform("P");
+		pShip->addUniform("V");
+		pShip->addUniform("M");
+		pShip->addUniform("campos");
+		pShip->addAttribute("vertPos");
+		pShip->addAttribute("vertNor");
+		pShip->addAttribute("vertTex");
 	}
 
 	/****DRAW
@@ -498,7 +542,7 @@ public:
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, Texture2);
 		glDisable(GL_DEPTH_TEST);
-		shape->draw(psky); //render!!!!!!!
+		sphere->draw(psky); //render!!!!!!!
 		glEnable(GL_DEPTH_TEST);
 		psky->unbind();
 
@@ -508,52 +552,72 @@ public:
 		static PlayerShip ship;
 
 		glm::mat4 TransPlane = glm::translate(glm::mat4(1.0f), vec3(0, 0, 0));
-		glm::mat4 SPlane = glm::scale(glm::mat4(1.0f), glm::vec3(0.5));
-		ship.update(mousePos);
-		// vec2 mouseDif = mousePos - vec2(0.5);
-		// double spdFact = abs(glm::min(glm::length(mouseDif * vec2(2)), 1.0f));
-		// static double smoothSpdFact = 0.0;
-		// smoothSpdFact += (spdFact - smoothSpdFact) * 0.5;
-		// double shipDir = atan2(-mouseDif.y, mouseDif.x);
-		// static double smoothDir = 0.0;
-		// smoothDir += (shipDir - smoothDir) * 0.07;
-		// vec3 spd = vec3(0.2);
-		// static vec3 shipPos = vec3(0.0);
-		// shipPos += vec3(cos(smoothDir), 0, -sin(smoothDir)) * spd * vec3(smoothSpdFact);
-
+		glm::mat4 SPlane = glm::scale(glm::mat4(1.0f), glm::vec3(ship.scale));
+		ship.update(mousePos, frametime);
 		glm::mat4 Rot = glm::rotate(mat4(1.0), (float)ship.angle, vec3(0, 1, 0));
 
 		M = TransPlane * SPlane * Rot;
 
-		pplane->bind();
-		glUniformMatrix4fv(pplane->getUniform("P"), 1, GL_FALSE, &P[0][0]);
-		glUniformMatrix4fv(pplane->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-		glUniformMatrix4fv(pplane->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-		glUniform3fv(pplane->getUniform("campos"), 1, &mycam.pos[0]);
+		pShip->bind();
+		glUniformMatrix4fv(pShip->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+		glUniformMatrix4fv(pShip->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		glUniformMatrix4fv(pShip->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glUniform3fv(pShip->getUniform("campos"), 1, &mycam.pos[0]);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, Texture2);
-		plane->draw(pplane); //render!!!!!!!
-		pplane->unbind();
-
-		Planet planets[] = {
-			Planet(),
-			Planet(),
-			Planet(),
-		};
-
-		for (int i = 0; i < 3; i++)
+		shipMesh->draw(pShip); //render!!!!!!!
+		pShip->unbind();
+		if (false)
 		{
-			M = glm::translate(mat4(1.0), ship.pos - planets[i].pos) * SPlane * Rot;
-
-			pplane->bind();
-			glUniformMatrix4fv(pplane->getUniform("P"), 1, GL_FALSE, &P[0][0]);
-			glUniformMatrix4fv(pplane->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-			glUniformMatrix4fv(pplane->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-			glUniform3fv(pplane->getUniform("campos"), 1, &mycam.pos[0]);
+			prog->bind();
+			M = mat4(1.0);
+			glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+			glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+			glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, Texture2);
-			shape->draw(pplane); //render!!!!!!!
-			pplane->unbind();
+			plane->draw(prog);
+			prog->unbind();
+		}
+
+		for (auto &planet : planets)
+		{
+			planet.update(total_time);
+			M = glm::translate(mat4(1.0), ship.pos - planet.pos) * glm::scale(mat4(1), vec3(planet.scale)) * planet.rotMat;
+			if (ship.intersects(planet))
+			{
+				ship.pos = vec3(0);
+			}
+
+			pShip->bind();
+			glUniformMatrix4fv(pShip->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+			glUniformMatrix4fv(pShip->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+			glUniformMatrix4fv(pShip->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+			glUniform3fv(pShip->getUniform("campos"), 1, &mycam.pos[0]);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, Texture2);
+			sphere->draw(pShip);
+			pShip->unbind();
+		}
+
+		for (auto &asteroid : asteroids)
+		{
+			asteroid.update(total_time);
+			M = glm::translate(mat4(1.0), ship.pos - asteroid.pos) * glm::scale(mat4(1), vec3(asteroid.scale)) * glm::rotate(mat4(1.0), (float)(total_time * asteroid.rotScalar), vec3(0, 1, 0));
+			if (ship.intersects(asteroid))
+			{
+				ship.pos = vec3(0);
+			}
+
+			pShip->bind();
+			glUniformMatrix4fv(pShip->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+			glUniformMatrix4fv(pShip->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+			glUniformMatrix4fv(pShip->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+			glUniform3fv(pShip->getUniform("campos"), 1, &mycam.pos[0]);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, Texture2);
+			asteroidMesh->draw(pShip);
+			pShip->unbind();
 		}
 
 		//draw the lines
