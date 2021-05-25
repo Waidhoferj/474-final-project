@@ -11,6 +11,7 @@
 #include "Shape.h"
 #include "line.h"
 #include "Program.h"
+#include <iostream>
 
 using namespace glm;
 using namespace std;
@@ -55,17 +56,20 @@ class PlayerShip
 {
 public:
     static Shape shape;
-    ShipState state = Delivering;
+    ShipState state = Flying;
     static vector<vec3> bounds;
     vec3 pos;
     double scale = 0.5;
     double angle;
     int points;
+    mat4 rotMat;
+    Planet *destination;
     double time_left;
     void update(vec2 mousePos, double dt);
     void updatePos(vec2 mousePos);
     bool intersects(Asteroid &asteroid);
     bool intersects(Planet &planet);
+    void chooseNewDestination(vector<Planet> &planets);
     void respawn();
 };
 

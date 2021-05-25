@@ -2,7 +2,7 @@
 
 void PlayerShip::update(vec2 mousePos, double dt)
 {
-    if (state == Delivering)
+    if (state == Flying)
         updatePos(mousePos);
     time_left -= dt;
     // if (time_left < 0.0)
@@ -10,21 +10,42 @@ void PlayerShip::update(vec2 mousePos, double dt)
     //     points = 0;
     //     pos = vec3(0);
     // }
+    bool withinDeliveryDist = glm::length(destination->pos - pos) < scale + destination->scale + 1.0;
+    if (withinDeliveryDist)
+    {
+        state = Delivering;
+    }
 }
 
 void PlayerShip::updatePos(vec2 mousePos)
 {
     vec2 mouseDif = mousePos - vec2(0.5);
+    static vec2 smoothDif = mouseDif;
+    smoothDif += (mouseDif - smoothDif) * vec2(0.07);
     double spdFact = abs(glm::min(glm::length(mouseDif * vec2(2)), 1.0f));
     static double smoothSpdFact = 0.0;
     smoothSpdFact += (spdFact - smoothSpdFact) * 0.5;
-    double shipDir = atan2(-mouseDif.y, mouseDif.x);
-    static double smoothDir = 0.0;
-    smoothDir += (shipDir - smoothDir) * 0.07;
-    angle = smoothDir;
+    double angle = atan2(-mouseDif.y, mouseDif.x);
+    quat shipRot = quat(rotate(mat4(1.0), (float)angle, vec3(0, 1, 0)));
+    static quat smoothDir = quat(mat4(1.0));
+    smoothDir = slerp(smoothDir, shipRot, 0.07f);
+    rotMat = mat4(smoothDir);
     vec3 spd = vec3(0.2);
     static vec3 shipPos = vec3(0.0);
-    pos += vec3(cos(smoothDir), 0, -sin(smoothDir)) * spd * vec3(smoothSpdFact);
+    vec3 smoothAngles = eulerAngles(smoothDir);
+    vec3 shipDir = vec3(cos(smoothDif.x < 0 ? acos(0) * 2 - smoothAngles.y : smoothAngles.y), 0, -sin(smoothAngles.y));
+    pos += shipDir * spd * vec3(smoothSpdFact);
+}
+
+void PlayerShip::chooseNewDestination(vector<Planet> &planets)
+{
+    Planet *newP;
+    do
+    {
+        int i = ((double)rand()) / RAND_MAX * (planets.size() - 1);
+        newP = &planets[i];
+    } while (newP == destination);
+    destination = newP;
 }
 
 bool PlayerShip::intersects(Asteroid &asteroid)
@@ -40,7 +61,7 @@ void PlayerShip::respawn()
 {
     points = 0;
     pos = vec3(0);
-    state = Delivering;
+    state = Flying;
 }
 
 Planet::Planet()

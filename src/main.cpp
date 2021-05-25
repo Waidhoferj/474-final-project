@@ -27,6 +27,7 @@ shared_ptr<Shape> shipMesh;
 shared_ptr<Shape> asteroidMesh;
 shared_ptr<Shape> ufoMesh;
 
+PlayerShip ship;
 vector<Planet> planets;
 vector<Asteroid> asteroids;
 
@@ -92,7 +93,7 @@ public:
 	WindowManager *windowManager = nullptr;
 
 	// Our shader program
-	std::shared_ptr<Program> prog, pTile, psky, pShip;
+	std::shared_ptr<Program> prog, pTile, psky, pMesh, pWaypoint;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID;
@@ -224,10 +225,41 @@ public:
 		plane->loadMesh(resourceDirectory + "/plane.obj");
 		plane->resize();
 		plane->init();
+		vector<vec3> positions;
+		positions.push_back(vec3(0, 0, 0));
+		positions.push_back(vec3(0, 0, -2)); // Reserve the middle.
+		int num_planets = 10;
+		int failed_attempts = 0;
+		int choice_thresh = 200;
+		double dist_range = 25.0;
+		// Poisson disc sample the planets
+		while (planets.size() < num_planets)
+		{
+			double x = (double)rand() / RAND_MAX * dist_range * 2.0 - dist_range;
+			double y = 0.0;
+			double z = (double)rand() / RAND_MAX * dist_range * 2.0 - dist_range;
+			vec3 pos = vec3(x, y, z);
+			bool valid = true;
+			for (auto &position : positions)
+			{
+				valid &= distance(pos, position) > 10.0f;
+			}
 
-		planets.push_back(Planet(vec3(0, 0, 20)));
-		planets.push_back(Planet(vec3(5, 0, 15)));
-		planets.push_back(Planet(vec3(3, 0, 4)));
+			if (!valid)
+			{
+				failed_attempts++;
+				if (failed_attempts > choice_thresh)
+					break;
+				continue;
+			}
+			failed_attempts = 0;
+
+			positions.push_back(pos);
+			planets.push_back(Planet(pos));
+		}
+		cout << planets.size() << endl;
+
+		ship.chooseNewDestination(planets);
 
 		asteroidMesh = make_shared<Shape>();
 		asteroidMesh->loadMesh(resourceDirectory + "/asteroid.obj");
@@ -474,6 +506,23 @@ public:
 		prog->addAttribute("vertNor");
 		prog->addAttribute("vertTex");
 
+		pWaypoint = std::make_shared<Program>();
+		pWaypoint->setVerbose(true);
+		pWaypoint->setShaderNames(resourceDirectory + "/shader_vertex.glsl", resourceDirectory + "/waypoint_fragment.glsl");
+		if (!pWaypoint->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		pWaypoint->addUniform("P");
+		pWaypoint->addUniform("V");
+		pWaypoint->addUniform("M");
+		pWaypoint->addUniform("campos");
+		pWaypoint->addUniform("col");
+		pWaypoint->addAttribute("vertPos");
+		pWaypoint->addAttribute("vertNor");
+		pWaypoint->addAttribute("vertTex");
+
 		pTile = std::make_shared<Program>();
 		pTile->setVerbose(true);
 		pTile->setShaderNames(resourceDirectory + "/tile_vertex.glsl", resourceDirectory + "/tile_fragment.glsl");
@@ -509,21 +558,21 @@ public:
 		psky->addAttribute("vertNor");
 		psky->addAttribute("vertTex");
 
-		pShip = std::make_shared<Program>();
-		pShip->setVerbose(true);
-		pShip->setShaderNames(resourceDirectory + "/plane_vertex.glsl", resourceDirectory + "/plane_frag.glsl");
-		if (!pShip->init())
+		pMesh = std::make_shared<Program>();
+		pMesh->setVerbose(true);
+		pMesh->setShaderNames(resourceDirectory + "/plane_vertex.glsl", resourceDirectory + "/plane_frag.glsl");
+		if (!pMesh->init())
 		{
 			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
 			exit(1);
 		}
-		pShip->addUniform("P");
-		pShip->addUniform("V");
-		pShip->addUniform("M");
-		pShip->addUniform("campos");
-		pShip->addAttribute("vertPos");
-		pShip->addAttribute("vertNor");
-		pShip->addAttribute("vertTex");
+		pMesh->addUniform("P");
+		pMesh->addUniform("V");
+		pMesh->addUniform("M");
+		pMesh->addUniform("campos");
+		pMesh->addAttribute("vertPos");
+		pMesh->addAttribute("vertNor");
+		pMesh->addAttribute("vertTex");
 	}
 
 	/****DRAW
@@ -580,44 +629,48 @@ public:
 		sphere->draw(psky); //render!!!!!!!
 		glEnable(GL_DEPTH_TEST);
 		psky->unbind();
-
+		// Position Cam
 		mycam.pos = vec3(0, 8, -8);
 		V = glm::lookAt(mycam.pos, vec3(0, 0, 0), vec3(0, 1, 0));
-		// Draw the plane using GLSL.
-		static PlayerShip ship;
+
+		// Draw Ship
 
 		glm::mat4 TransPlane = glm::translate(glm::mat4(1.0f), vec3(0, 0, 0));
 		glm::mat4 SPlane = glm::scale(glm::mat4(1.0f), glm::vec3(ship.scale));
 		ship.update(mousePos, frametime);
 		glm::mat4 Rot = glm::rotate(mat4(1.0), (float)ship.angle, vec3(0, 1, 0));
 
-		M = TransPlane * SPlane * Rot;
+		M = TransPlane * SPlane * ship.rotMat;
 
-		pShip->bind();
-		glUniformMatrix4fv(pShip->getUniform("P"), 1, GL_FALSE, &P[0][0]);
-		glUniformMatrix4fv(pShip->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-		glUniformMatrix4fv(pShip->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-		glUniform3fv(pShip->getUniform("campos"), 1, &mycam.pos[0]);
+		pMesh->bind();
+		glUniformMatrix4fv(pMesh->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+		glUniformMatrix4fv(pMesh->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		glUniformMatrix4fv(pMesh->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glUniform3fv(pMesh->getUniform("campos"), 1, &mycam.pos[0]);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, Texture2);
-		shipMesh->draw(pShip); //render!!!!!!!
-		pShip->unbind();
+		shipMesh->draw(pMesh); //render!!!!!!!
+		pMesh->unbind();
+		static double anim_time = 0;
+
+		// Handle different ship states
 		if (ship.state == Exploding)
 		{
 			double duration = 0.7;
-			static double exp_time = 0;
-			if (exp_time > duration)
+
+			if (anim_time > duration)
 			{
 				ship.respawn();
-				exp_time = 0.0;
+				ship.chooseNewDestination(planets);
+				anim_time = 0.0;
 			}
 			else
 			{
 				pTile->bind();
 				static vec2 offset = vec2(0.0, 0.0);
-				double anim_time = (total_time / duration * 16.0);
-				int frame_num = (int)anim_time;
-				double t = anim_time - (double)frame_num;
+				double tile_time = (total_time / duration * 16.0);
+				int frame_num = (int)tile_time;
+				double t = tile_time - (double)frame_num;
 				offset.x = (frame_num % 4);
 				offset.y = frame_num / 4;
 				static vec2 prev_offset = vec2(0.0, 0.0);
@@ -635,20 +688,38 @@ public:
 				plane->draw(pTile);
 				pTile->unbind();
 
-				exp_time += frametime;
+				anim_time += frametime;
 			}
 		}
+		else if (ship.state == Delivering)
+		{
+			double duration = 0.5;
+			// Animation over
+			if (anim_time > duration)
+			{
+				// Flip ship around
+				ship.rotMat *= glm::rotate(mat4(1.0), (float)(acos(0) * 2), vec3(0, 1, 0));
+				ship.chooseNewDestination(planets);
+				ship.state = Flying;
+				anim_time = 0.0;
+			}
+			else //Play animation
+			{
+				// Show delivered message
+				prog->bind();
+				M = glm::translate(mat4(1.0), vec3(0, 0.7, 1)) * glm::lookAt(vec3(0), mycam.pos, vec3(0, 1, 0)) * glm::scale(mat4(1), vec3(0.7));
+				glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+				glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+				glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_2D, Texture3);
+				plane->draw(prog);
+				prog->unbind();
+			}
+			anim_time += frametime;
+		}
 
-		prog->bind();
-		M = glm::translate(mat4(1.0), vec3(0, 0.7, 1)) * glm::lookAt(vec3(0), mycam.pos, vec3(0, 1, 0)) * glm::scale(mat4(1), vec3(0.7));
-		glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, &P[0][0]);
-		glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, Texture3);
-		plane->draw(prog);
-		prog->unbind();
-
+		// Draw the planets
 		for (auto &planet : planets)
 		{
 			planet.update(total_time);
@@ -658,17 +729,48 @@ public:
 				ship.state = Exploding;
 			}
 
-			pShip->bind();
-			glUniformMatrix4fv(pShip->getUniform("P"), 1, GL_FALSE, &P[0][0]);
-			glUniformMatrix4fv(pShip->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-			glUniformMatrix4fv(pShip->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-			glUniform3fv(pShip->getUniform("campos"), 1, &mycam.pos[0]);
+			pMesh->bind();
+			glUniformMatrix4fv(pMesh->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+			glUniformMatrix4fv(pMesh->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+			glUniformMatrix4fv(pMesh->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+			glUniform3fv(pMesh->getUniform("campos"), 1, &mycam.pos[0]);
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, Texture2);
-			sphere->draw(pShip);
-			pShip->unbind();
+			sphere->draw(pMesh);
+			pMesh->unbind();
 		}
 
+		// Draw planet waypoint
+		if (ship.destination)
+		{
+			M = glm::translate(mat4(1.0), ship.pos - ship.destination->pos) * glm::scale(mat4(1), vec3(ship.destination->scale + 1.0));
+			pWaypoint->bind();
+			glUniformMatrix4fv(pWaypoint->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+			glUniformMatrix4fv(pWaypoint->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+			glUniformMatrix4fv(pWaypoint->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+			glUniform4f(pWaypoint->getUniform("col"), 0.0f, 0.7f, 0.0f, 0.4f);
+			glUniform3fv(pWaypoint->getUniform("campos"), 1, &mycam.pos[0]);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, Texture2);
+			sphere->draw(pWaypoint);
+			pWaypoint->unbind();
+		}
+
+		// Draw direction waypoint
+		vec3 planetDir = normalize(ship.destination->pos - ship.pos);
+		M = glm::translate(mat4(1.0), -planetDir * vec3(1.1)) * glm::scale(mat4(1), vec3(0.07));
+		pWaypoint->bind();
+		glUniformMatrix4fv(pWaypoint->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+		glUniformMatrix4fv(pWaypoint->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		glUniformMatrix4fv(pWaypoint->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glUniform4f(pWaypoint->getUniform("col"), 0.0f, 0.7f, 0.0f, 0.7f);
+		glUniform3fv(pWaypoint->getUniform("campos"), 1, &mycam.pos[0]);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, Texture2);
+		sphere->draw(pWaypoint);
+		pWaypoint->unbind();
+
+		// Draw asteroids
 		for (auto &asteroid : asteroids)
 		{
 			asteroid.update(total_time);
@@ -678,15 +780,15 @@ public:
 				ship.state = Exploding;
 			}
 
-			pShip->bind();
-			glUniformMatrix4fv(pShip->getUniform("P"), 1, GL_FALSE, &P[0][0]);
-			glUniformMatrix4fv(pShip->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-			glUniformMatrix4fv(pShip->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-			glUniform3fv(pShip->getUniform("campos"), 1, &mycam.pos[0]);
+			pMesh->bind();
+			glUniformMatrix4fv(pMesh->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+			glUniformMatrix4fv(pMesh->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+			glUniformMatrix4fv(pMesh->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+			glUniform3fv(pMesh->getUniform("campos"), 1, &mycam.pos[0]);
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, Texture2);
-			asteroidMesh->draw(pShip);
-			pShip->unbind();
+			asteroidMesh->draw(pMesh);
+			pMesh->unbind();
 		}
 
 		//draw the lines
