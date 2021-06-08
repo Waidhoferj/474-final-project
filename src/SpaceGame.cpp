@@ -5,6 +5,12 @@ void PlayerShip::update(vec2 mousePos, double dt)
     if (state == Flying)
         updatePos(mousePos);
     time_left -= dt;
+    if (time_left < 0.0)
+    {
+        time_left = 0.0;
+        state = Exploding;
+    }
+
     // if (time_left < 0.0)
     // {
     //     points = 0;
@@ -61,6 +67,7 @@ void PlayerShip::respawn()
 {
     points = 0;
     pos = vec3(0);
+    time_left = 30.0;
     state = Flying;
 }
 

@@ -93,7 +93,7 @@ public:
 	WindowManager *windowManager = nullptr;
 
 	// Our shader program
-	std::shared_ptr<Program> prog, pTile, psky, pMesh, pWaypoint;
+	std::shared_ptr<Program> prog, pBilboard, pTile, psky, pMesh, pWaypoint, pTimer;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID;
@@ -105,6 +105,7 @@ public:
 	GLuint Texture;
 	GLuint Texture2;
 	GLuint Texture3;
+	GLuint Texture4;
 
 	double total_time = 0.0;
 
@@ -257,7 +258,6 @@ public:
 			positions.push_back(pos);
 			planets.push_back(Planet(pos));
 		}
-		cout << planets.size() << endl;
 
 		ship.chooseNewDestination(planets);
 
@@ -398,7 +398,7 @@ public:
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		glGenerateMipmap(GL_TEXTURE_2D);
 		//texture 2
-		str = resourceDirectory + "/sky.jpg";
+		str = resourceDirectory + "/background.jpg";
 		strcpy(filepath, str.c_str());
 		data = stbi_load(filepath, &width, &height, &channels, 4);
 		glGenTextures(1, &Texture2);
@@ -424,6 +424,19 @@ public:
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		glGenerateMipmap(GL_TEXTURE_2D);
 
+		str = resourceDirectory + "/numbers.png";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &Texture4);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, Texture4);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
 		//[TWOTEXTURES]
 		//set the 2 textures to the correct samplers in the fragment shader:
 		GLuint Tex1Location = glGetUniformLocation(prog->pid, "tex"); //tex, tex2... sampler in the fragment shader
@@ -436,47 +449,6 @@ public:
 		glUniform1i(Tex3Location, 2);
 		float rad = 3.0;
 		float z_dist = -6;
-		// Initialize the maneuver path
-		smoothrender.init();
-		linerender.init();
-		line.push_back(vec3(0, 1, z_dist));
-		line.push_back(vec3(0, 0, z_dist += 3));
-		line.push_back(vec3(0, -1, z_dist += 6));
-		// Dive down
-		line.push_back(vec3(0, -rad, z_dist += 5));
-
-		//climb up and to the right
-		line.push_back(vec3(rad, 0, z_dist += 5));
-
-		// top out
-		line.push_back(vec3(0, rad, z_dist += 5));
-
-		// down to 270º
-		line.push_back(vec3(-rad, 0, z_dist += 5));
-
-		// bottom out
-		line.push_back(vec3(0, -rad, z_dist += 5));
-
-		//exit
-		line.push_back(vec3(0, -rad / 2, z_dist += 6));
-		line.push_back(vec3(0, 0, z_dist += 6));
-
-		linerender.re_init_line(line);
-		spline(splinepoints, line, 200, 2);
-
-		// Initialize the maneuver angles
-		vec3 maneuver_axis = vec3(0, 1, 0);
-		mat4 upside_down = rotate(mat4(1.0), 180.0f, maneuver_axis);
-		mat4 bank_right = rotate(mat4(1.0), -90.0f, maneuver_axis);
-		mat4 bank_left = rotate(mat4(1.0), 90.0f, maneuver_axis);
-		mat4 level = rotate(mat4(1.0), 0.0f, maneuver_axis);
-		for (int i = 0; i < 4; i++)
-			Marr.push_back(level);
-		Marr.push_back(bank_right);
-		Marr.push_back(upside_down);
-		Marr.push_back(bank_left);
-		for (int i = 0; i < 4; i++)
-			Marr.push_back(level);
 	}
 
 	//General OGL initialization - set OGL state here
@@ -505,6 +477,39 @@ public:
 		prog->addAttribute("vertPos");
 		prog->addAttribute("vertNor");
 		prog->addAttribute("vertTex");
+
+		pBilboard = std::make_shared<Program>();
+		pBilboard->setVerbose(true);
+		pBilboard->setShaderNames(resourceDirectory + "/bilboard_vertex.glsl", resourceDirectory + "/bilboard_frag.glsl");
+		if (!pBilboard->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		pBilboard->addUniform("P");
+		pBilboard->addUniform("V");
+		pBilboard->addUniform("M");
+		pBilboard->addUniform("campos");
+		pBilboard->addAttribute("vertPos");
+		pBilboard->addAttribute("vertNor");
+		pBilboard->addAttribute("vertTex");
+
+		pTimer = std::make_shared<Program>();
+		pTimer->setVerbose(true);
+		pTimer->setShaderNames(resourceDirectory + "/timer_vertex.glsl", resourceDirectory + "/timer_frag.glsl");
+		if (!pTimer->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		pTimer->addUniform("P");
+		pTimer->addUniform("V");
+		pTimer->addUniform("M");
+		pTimer->addUniform("timer");
+		pTimer->addUniform("campos");
+		pTimer->addAttribute("vertPos");
+		pTimer->addAttribute("vertNor");
+		pTimer->addAttribute("vertTex");
 
 		pWaypoint = std::make_shared<Program>();
 		pWaypoint->setVerbose(true);
@@ -633,6 +638,18 @@ public:
 		mycam.pos = vec3(0, 8, -8);
 		V = glm::lookAt(mycam.pos, vec3(0, 0, 0), vec3(0, 1, 0));
 
+		// draw univers plane????
+		pBilboard->bind();
+
+		M = glm::translate(mat4(1.0), vec3(0, -5, 6)) * scale(mat4(1), vec3(20));
+		glUniformMatrix4fv(pBilboard->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+		glUniformMatrix4fv(pBilboard->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		glUniformMatrix4fv(pBilboard->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, Texture2);
+		plane->draw(pBilboard);
+		pBilboard->unbind();
+
 		// Draw Ship
 
 		glm::mat4 TransPlane = glm::translate(glm::mat4(1.0f), vec3(0, 0, 0));
@@ -700,21 +717,22 @@ public:
 				// Flip ship around
 				ship.rotMat *= glm::rotate(mat4(1.0), (float)(acos(0) * 2), vec3(0, 1, 0));
 				ship.chooseNewDestination(planets);
+				ship.time_left = 30.0;
 				ship.state = Flying;
 				anim_time = 0.0;
 			}
 			else //Play animation
 			{
 				// Show delivered message
-				prog->bind();
+				pBilboard->bind();
 				M = glm::translate(mat4(1.0), vec3(0, 0.7, 1)) * glm::lookAt(vec3(0), mycam.pos, vec3(0, 1, 0)) * glm::scale(mat4(1), vec3(0.7));
-				glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, &P[0][0]);
-				glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-				glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+				glUniformMatrix4fv(pBilboard->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+				glUniformMatrix4fv(pBilboard->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+				glUniformMatrix4fv(pBilboard->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 				glActiveTexture(GL_TEXTURE0);
 				glBindTexture(GL_TEXTURE_2D, Texture3);
-				plane->draw(prog);
-				prog->unbind();
+				plane->draw(pBilboard);
+				pBilboard->unbind();
 			}
 			anim_time += frametime;
 		}
@@ -790,6 +808,20 @@ public:
 			asteroidMesh->draw(pMesh);
 			pMesh->unbind();
 		}
+
+		// Draw GUI
+		glDisable(GL_DEPTH_TEST);
+		pTimer->bind();
+		M = glm::translate(mat4(1.0), vec3(0, -10.0, 1)) * glm::lookAt(vec3(0), mycam.pos, vec3(0, 1, 0)) * glm::scale(mat4(1), vec3(0.6));
+		glUniformMatrix4fv(pTimer->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+		glUniformMatrix4fv(pTimer->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		glUniformMatrix4fv(pTimer->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glUniform1i(pTimer->getUniform("timer"), (int)ship.time_left);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, Texture4);
+		plane->draw(pTimer);
+		pTimer->unbind();
+		glEnable(GL_DEPTH_TEST);
 
 		//draw the lines
 

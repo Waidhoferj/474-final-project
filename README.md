@@ -8,7 +8,7 @@ Interstellar delivery service is a 2D-ish top down game where you play as a deli
 
 Object on a path: Planets asteroids (and other ships if time permits)
 Billboard animation : I’ll use the explosion texture animation for the ship being destroyed
-Particle system : Space hazards & photon torpedos? I’ll have something that emits hazardous particles where particles have a lifetime and such.
+Particle system : Space hazards & photon torpedoes? I’ll have something that emits hazardous particles where particles have a lifetime and such.
 
 ## Ubuntu Linux
 

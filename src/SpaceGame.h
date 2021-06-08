@@ -64,7 +64,7 @@ public:
     int points;
     mat4 rotMat;
     Planet *destination;
-    double time_left;
+    double time_left = 30.0;
     void update(vec2 mousePos, double dt);
     void updatePos(vec2 mousePos);
     bool intersects(Asteroid &asteroid);
