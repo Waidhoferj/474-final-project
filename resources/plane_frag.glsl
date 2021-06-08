@@ -6,6 +6,7 @@ in vec2 vertex_tex;
 uniform vec3 campos;
 
 uniform sampler2D tex;
+uniform float opacity = 1.0;
 
 void main()
 {
@@ -24,6 +25,6 @@ vec4 tcol = texture(tex, vec2(vertex_tex.x,1-vertex_tex.y)); //the plane has rev
 //color = tcol;
 
 color.rgb =  tcol.rgb*diffuse_fact + vec3(1,1,1)*spec_fact;
-color.a=1;
+color.a=opacity;
 
 }

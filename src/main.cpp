@@ -93,7 +93,7 @@ public:
 	WindowManager *windowManager = nullptr;
 
 	// Our shader program
-	std::shared_ptr<Program> prog, pBilboard, pTile, psky, pMesh, pWaypoint, pTimer;
+	std::shared_ptr<Program> prog, pBilboard, pTile, psky, pMesh, pWaypoint, pNumbers;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID;
@@ -106,6 +106,8 @@ public:
 	GLuint Texture2;
 	GLuint Texture3;
 	GLuint Texture4;
+	GLuint TextureDeliveries;
+	GLuint TextureTimeLeft;
 
 	double total_time = 0.0;
 
@@ -437,6 +439,32 @@ public:
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		glGenerateMipmap(GL_TEXTURE_2D);
 
+		str = resourceDirectory + "/deliveries.png";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &TextureDeliveries);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, TextureDeliveries);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		str = resourceDirectory + "/time-left.png";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &TextureTimeLeft);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, TextureTimeLeft);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
 		//[TWOTEXTURES]
 		//set the 2 textures to the correct samplers in the fragment shader:
 		GLuint Tex1Location = glGetUniformLocation(prog->pid, "tex"); //tex, tex2... sampler in the fragment shader
@@ -490,26 +518,27 @@ public:
 		pBilboard->addUniform("V");
 		pBilboard->addUniform("M");
 		pBilboard->addUniform("campos");
+		pBilboard->addUniform("flip");
 		pBilboard->addAttribute("vertPos");
 		pBilboard->addAttribute("vertNor");
 		pBilboard->addAttribute("vertTex");
 
-		pTimer = std::make_shared<Program>();
-		pTimer->setVerbose(true);
-		pTimer->setShaderNames(resourceDirectory + "/timer_vertex.glsl", resourceDirectory + "/timer_frag.glsl");
-		if (!pTimer->init())
+		pNumbers = std::make_shared<Program>();
+		pNumbers->setVerbose(true);
+		pNumbers->setShaderNames(resourceDirectory + "/numbers_vertex.glsl", resourceDirectory + "/numbers_frag.glsl");
+		if (!pNumbers->init())
 		{
 			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
 			exit(1);
 		}
-		pTimer->addUniform("P");
-		pTimer->addUniform("V");
-		pTimer->addUniform("M");
-		pTimer->addUniform("timer");
-		pTimer->addUniform("campos");
-		pTimer->addAttribute("vertPos");
-		pTimer->addAttribute("vertNor");
-		pTimer->addAttribute("vertTex");
+		pNumbers->addUniform("P");
+		pNumbers->addUniform("V");
+		pNumbers->addUniform("M");
+		pNumbers->addUniform("numberDisplay");
+		pNumbers->addUniform("campos");
+		pNumbers->addAttribute("vertPos");
+		pNumbers->addAttribute("vertNor");
+		pNumbers->addAttribute("vertTex");
 
 		pWaypoint = std::make_shared<Program>();
 		pWaypoint->setVerbose(true);
@@ -575,6 +604,7 @@ public:
 		pMesh->addUniform("V");
 		pMesh->addUniform("M");
 		pMesh->addUniform("campos");
+		pMesh->addUniform("opacity");
 		pMesh->addAttribute("vertPos");
 		pMesh->addAttribute("vertNor");
 		pMesh->addAttribute("vertTex");
@@ -603,52 +633,33 @@ public:
 
 		// Create the matrix stacks - please leave these alone for now
 
-		glm::mat4 V, M, P; //View, Model and Perspective matrix
+		glm::mat4 V, M, P, P_Ortho; //View, Model and Perspective matrix
 
 		M = glm::mat4(1);
 		// Apply orthographic projection....
-		P = glm::ortho(-1 * aspect, 1 * aspect, -1.0f, 1.0f, -2.0f, 100.0f);
+		P_Ortho = glm::ortho(-1 * aspect, 1 * aspect, -1.0f, 1.0f, -2.0f, 100.0f);
 		if (width < height)
 		{
-			P = glm::ortho(-1.0f, 1.0f, -1.0f / aspect, 1.0f / aspect, -2.0f, 100.0f);
+			P_Ortho = glm::ortho(-1.0f, 1.0f, -1.0f / aspect, 1.0f / aspect, -2.0f, 100.0f);
 		}
 		// ...but we overwrite it (optional) with a perspective projection.
 		P = glm::perspective((float)(3.14159 / 4.), (float)((float)width / (float)height), 0.1f, 1000.0f); //so much type casting... GLM metods are quite funny ones
-		float sangle = 3.1415926 / 2.;
-		glm::mat4 RotateXSky = glm::rotate(glm::mat4(1.0f), sangle, glm::vec3(1.0f, 0.0f, 0.0f));
-		glm::vec3 camp = vec3(0, 0, 0);
-		glm::mat4 TransSky = glm::translate(glm::mat4(1.0f), camp);
-		glm::mat4 SSky = glm::scale(glm::mat4(1.0f), glm::vec3(0.8f, 0.8f, 0.8f));
-
-		M = TransSky * RotateXSky * SSky;
-
-		// Draw the sky using GLSL.
-		psky->bind();
-		glUniformMatrix4fv(psky->getUniform("P"), 1, GL_FALSE, &P[0][0]);
-		glUniformMatrix4fv(psky->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-		glUniformMatrix4fv(psky->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-		glUniform3fv(psky->getUniform("campos"), 1, &mycam.pos[0]);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, Texture2);
-		glDisable(GL_DEPTH_TEST);
-		sphere->draw(psky); //render!!!!!!!
-		glEnable(GL_DEPTH_TEST);
-		psky->unbind();
 		// Position Cam
 		mycam.pos = vec3(0, 8, -8);
 		V = glm::lookAt(mycam.pos, vec3(0, 0, 0), vec3(0, 1, 0));
 
-		// draw univers plane????
+		// draw universe plane
+		glDisable(GL_DEPTH_TEST);
 		pBilboard->bind();
-
-		M = glm::translate(mat4(1.0), vec3(0, -5, 6)) * scale(mat4(1), vec3(20));
-		glUniformMatrix4fv(pBilboard->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+		M = scale(mat4(1.0), vec3(2.0));
+		glUniformMatrix4fv(pBilboard->getUniform("P"), 1, GL_FALSE, &P_Ortho[0][0]);
 		glUniformMatrix4fv(pBilboard->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 		glUniformMatrix4fv(pBilboard->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, Texture2);
 		plane->draw(pBilboard);
 		pBilboard->unbind();
+		glEnable(GL_DEPTH_TEST);
 
 		// Draw Ship
 
@@ -663,6 +674,7 @@ public:
 		glUniformMatrix4fv(pMesh->getUniform("P"), 1, GL_FALSE, &P[0][0]);
 		glUniformMatrix4fv(pMesh->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 		glUniformMatrix4fv(pMesh->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glUniform1f(pMesh->getUniform("opacity"), ship.opacity);
 		glUniform3fv(pMesh->getUniform("campos"), 1, &mycam.pos[0]);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, Texture2);
@@ -710,31 +722,50 @@ public:
 		}
 		else if (ship.state == Delivering)
 		{
-			double duration = 0.5;
+			double duration = 1.0;
+			ship.opacity = 0.5;
 			// Animation over
-			if (anim_time > duration)
+			if (anim_time == 0.0)
 			{
-				// Flip ship around
-				ship.rotMat *= glm::rotate(mat4(1.0), (float)(acos(0) * 2), vec3(0, 1, 0));
 				ship.chooseNewDestination(planets);
 				ship.time_left = 30.0;
+				ship.points += 1;
+			}
+			else if (anim_time > duration)
+			{
+				// Flip ship around
 				ship.state = Flying;
 				anim_time = 0.0;
+				ship.opacity = 1.0;
 			}
 			else //Play animation
 			{
 				// Show delivered message
 				pBilboard->bind();
-				M = glm::translate(mat4(1.0), vec3(0, 0.7, 1)) * glm::lookAt(vec3(0), mycam.pos, vec3(0, 1, 0)) * glm::scale(mat4(1), vec3(0.7));
-				glUniformMatrix4fv(pBilboard->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+				M = glm::translate(mat4(1.0), vec3(0, 0.9, 1)) * glm::lookAt(vec3(0), mycam.pos, vec3(0, 1, 0)) * glm::scale(mat4(1), vec3(0.7));
+				glUniformMatrix4fv(pBilboard->getUniform("P"), 1, GL_FALSE, &P_Ortho[0][0]);
 				glUniformMatrix4fv(pBilboard->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 				glUniformMatrix4fv(pBilboard->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 				glActiveTexture(GL_TEXTURE0);
 				glBindTexture(GL_TEXTURE_2D, Texture3);
 				plane->draw(pBilboard);
 				pBilboard->unbind();
+
+				// Draw shield
+				M = glm::scale(mat4(1), vec3(ship.scale + 0.2));
+				pWaypoint->bind();
+				glUniformMatrix4fv(pWaypoint->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+				glUniformMatrix4fv(pWaypoint->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+				glUniformMatrix4fv(pWaypoint->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+				glUniform4f(pWaypoint->getUniform("col"), 0.47f, 0.870f, 0.96f, 0.4f);
+				glUniform3fv(pWaypoint->getUniform("campos"), 1, &mycam.pos[0]);
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_2D, Texture2);
+				sphere->draw(pWaypoint);
+				pWaypoint->unbind();
 			}
-			anim_time += frametime;
+			if (ship.state == Delivering)
+				anim_time += frametime;
 		}
 
 		// Draw the planets
@@ -811,16 +842,54 @@ public:
 
 		// Draw GUI
 		glDisable(GL_DEPTH_TEST);
-		pTimer->bind();
-		M = glm::translate(mat4(1.0), vec3(0, -10.0, 1)) * glm::lookAt(vec3(0), mycam.pos, vec3(0, 1, 0)) * glm::scale(mat4(1), vec3(0.6));
-		glUniformMatrix4fv(pTimer->getUniform("P"), 1, GL_FALSE, &P[0][0]);
-		glUniformMatrix4fv(pTimer->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-		glUniformMatrix4fv(pTimer->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-		glUniform1i(pTimer->getUniform("timer"), (int)ship.time_left);
+		// Draw timer
+		pNumbers->bind();
+		M = translate(mat4(1.0), vec3(-1.3, -1.3, 0)) * scale(mat4(1.0), vec3(0.07));
+		glUniformMatrix4fv(pNumbers->getUniform("P"), 1, GL_FALSE, &P_Ortho[0][0]);
+		glUniformMatrix4fv(pNumbers->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		glUniformMatrix4fv(pNumbers->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glUniform1i(pNumbers->getUniform("numberDisplay"), (int)ship.time_left);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, Texture4);
-		plane->draw(pTimer);
-		pTimer->unbind();
+		plane->draw(pNumbers);
+		pNumbers->unbind();
+
+		// Draw timer label
+		pBilboard->bind();
+		M = translate(mat4(1.0), vec3(0.0, 0.1, 0.0)) * M;
+		glUniformMatrix4fv(pBilboard->getUniform("P"), 1, GL_FALSE, &P_Ortho[0][0]);
+		glUniformMatrix4fv(pBilboard->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		glUniformMatrix4fv(pBilboard->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glUniform1i(pBilboard->getUniform("flip"), 1);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, TextureTimeLeft);
+		plane->draw(pBilboard);
+		pBilboard->unbind();
+
+		// Draw points counter
+		pNumbers->bind();
+		M = translate(mat4(1.0), vec3(1.3, -1.3, 0)) * scale(mat4(1.0), vec3(0.07));
+		glUniformMatrix4fv(pNumbers->getUniform("P"), 1, GL_FALSE, &P_Ortho[0][0]);
+		glUniformMatrix4fv(pNumbers->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		glUniformMatrix4fv(pNumbers->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glUniform1i(pNumbers->getUniform("numberDisplay"), ship.points);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, Texture4);
+		plane->draw(pNumbers);
+		pNumbers->unbind();
+
+		// Draw points label
+		pBilboard->bind();
+		M = translate(mat4(1.0), vec3(0.0, 0.1, 0.0)) * M;
+		glUniformMatrix4fv(pBilboard->getUniform("P"), 1, GL_FALSE, &P_Ortho[0][0]);
+		glUniformMatrix4fv(pBilboard->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		glUniformMatrix4fv(pBilboard->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glUniform1i(pBilboard->getUniform("flip"), 1);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, TextureDeliveries);
+		plane->draw(pBilboard);
+		pBilboard->unbind();
+
 		glEnable(GL_DEPTH_TEST);
 
 		//draw the lines

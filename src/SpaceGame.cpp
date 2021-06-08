@@ -2,7 +2,7 @@
 
 void PlayerShip::update(vec2 mousePos, double dt)
 {
-    if (state == Flying)
+    if (state == Flying || state == Delivering)
         updatePos(mousePos);
     time_left -= dt;
     if (time_left < 0.0)
@@ -10,12 +10,6 @@ void PlayerShip::update(vec2 mousePos, double dt)
         time_left = 0.0;
         state = Exploding;
     }
-
-    // if (time_left < 0.0)
-    // {
-    //     points = 0;
-    //     pos = vec3(0);
-    // }
     bool withinDeliveryDist = glm::length(destination->pos - pos) < scale + destination->scale + 1.0;
     if (withinDeliveryDist)
     {
@@ -56,16 +50,17 @@ void PlayerShip::chooseNewDestination(vector<Planet> &planets)
 
 bool PlayerShip::intersects(Asteroid &asteroid)
 {
-    return glm::length(glm::distance(asteroid.pos, pos)) <= asteroid.scale + scale;
+    return glm::length(glm::distance(asteroid.pos, pos)) <= asteroid.scale + scale && state == Flying;
 }
 bool PlayerShip::intersects(Planet &planet)
 {
-    return glm::length(glm::distance(planet.pos, pos)) <= planet.scale + scale;
+    return glm::length(glm::distance(planet.pos, pos)) <= planet.scale + scale && state == Flying;
 }
 
 void PlayerShip::respawn()
 {
     points = 0;
+    opacity = 1.0;
     pos = vec3(0);
     time_left = 30.0;
     state = Flying;

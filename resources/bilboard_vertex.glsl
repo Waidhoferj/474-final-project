@@ -5,10 +5,18 @@ layout(location = 2) in vec2 vertTex;
 uniform mat4 P;
 uniform mat4 V;
 uniform mat4 M;
+uniform int flip = 0;
 out vec2 vertex_tex;
 void main()
 {
 	vec4 pos = M * vec4(vertPos,1.0);
 	gl_Position = P * V * pos;
-	vertex_tex = vertTex;
+	if(flip == 1) {
+		vec2 flippedTex = vertTex;
+		flippedTex.x = 1.0 - flippedTex.x;
+		vertex_tex = flippedTex;
+	} else {
+		vertex_tex = vertTex;
+	}
+	
 }

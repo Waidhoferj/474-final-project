@@ -61,6 +61,7 @@ public:
     vec3 pos;
     double scale = 0.5;
     double angle;
+    float opacity = 1.0;
     int points;
     mat4 rotMat;
     Planet *destination;

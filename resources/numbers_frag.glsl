@@ -1,14 +1,14 @@
 #version 410 core
 out vec4 color;
 in vec2 vertex_tex;
-uniform int timer;
+uniform int numberDisplay;
 uniform vec3 campos;
 
 uniform sampler2D tex;
 
 void main()
 {
-int t = timer;
+int t = numberDisplay;
 vec2 tex_coord = vertex_tex;
 if(t < 0) t = 0;
 int tens = t / 10;
@@ -19,6 +19,7 @@ float width = 0.1;
 if(tex_coord.x > 0.5){
     float w = 1.0 - (tex_coord.x - 0.5) * 2.0;
     tex_coord.x = w * width + offsets.x;
+    if(tens < 1) discard;
 } else {
     //Ones
     float w = 1.0 - tex_coord.x * 2.0;
