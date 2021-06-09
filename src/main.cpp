@@ -760,20 +760,18 @@ public:
 				anim_time += frametime;
 		}
 		// Draw Particles
-
-		M = translate(mat4(1.0), vec3(-1.3, -1.3, 0)) * scale(mat4(1.0), vec3(0.07));
-		glDisable(GL_DEPTH_TEST);
-		pParticles->bind();
-		glUniformMatrix4fv(pParticles->getUniform("P"), 1, GL_FALSE, &P_Ortho[0][0]);
-		glUniformMatrix4fv(pParticles->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-		glUniformMatrix4fv(pParticles->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-		glUniform3fv(pParticles->getUniform("campos"), 1, &mycam.pos[0]);
-		glBindVertexArray(VertexArrayID);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, TextureParticle);
-		glDrawArrays(GL_POINTS, 0, 4);
-		pParticles->unbind();
-		glEnable(GL_DEPTH_TEST);
+		for (auto &p : ship.exhaust)
+		{
+			M = glm::translate(mat4(1.0), ship.pos - p.position) * glm::scale(mat4(1), vec3(0.07));
+			pWaypoint->bind();
+			glUniformMatrix4fv(pWaypoint->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+			glUniformMatrix4fv(pWaypoint->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+			glUniformMatrix4fv(pWaypoint->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+			glUniform4f(pWaypoint->getUniform("col"), 0.0f, 0.7f, 0.0f, 0.7f);
+			glUniform3fv(pWaypoint->getUniform("campos"), 1, &mycam.pos[0]);
+			sphere->draw(pWaypoint);
+			pWaypoint->unbind();
+		}
 
 		// Draw the planets
 		for (auto &planet : planets)
