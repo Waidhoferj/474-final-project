@@ -42,17 +42,19 @@ void PlayerShip::updatePos(vec2 mousePos, double dt)
     // draw particles
     static int part_counter = 0;
     part_counter++;
-    if (exhaust.size() < 30 && part_counter > 200)
+    vec3 exhaust_pos = pos - shipDir * vec3(0.8);
+    vec3 exhaust_vel = -v * vec3(1.5);
+    if (exhaust.size() < 25 && part_counter > 10)
     {
         part_counter = 0;
-        exhaust.push_back(Particle(pos, -v));
+        exhaust.push_back(Particle(exhaust_pos, exhaust_vel));
     }
 
     for (auto &p : exhaust)
     {
         bool shouldRespawn = p.update(dt);
         if (shouldRespawn)
-            p.respawn(pos, -v);
+            p.respawn(exhaust_pos, exhaust_vel);
     }
 }
 
@@ -138,14 +140,14 @@ Particle::Particle()
 {
     scale = 1.0;
     position = vec3(0, 0, 0);
-    life = lifetime = 3.0;
+    life = lifetime;
     velocity = vec3(0);
 }
 Particle::Particle(vec3 pos, vec3 vel)
 {
     scale = 1.0;
     position = vec3(0, 0, 0);
-    life = lifetime = 3.0;
+    life = lifetime;
     velocity = vel;
 }
 
@@ -161,8 +163,6 @@ bool Particle::update(float dt)
     life -= dt;
     if (life <= 0.0)
         return true;
-    vec3 drag = normalize(velocity) * vec3(0.05);
-    velocity -= drag;
     position += velocity;
     return false;
 }
