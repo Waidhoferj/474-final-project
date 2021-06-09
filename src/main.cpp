@@ -41,6 +41,7 @@ double get_last_elapsed_time()
 	lasttime = actualtime;
 	return difference;
 }
+
 class camera
 {
 public:
@@ -528,7 +529,6 @@ public:
 		pParticles->addUniform("V");
 		pParticles->addUniform("M");
 		pParticles->addUniform("pointColor");
-		pParticles->addUniform("campos");
 		pParticles->addAttribute("pointPos");
 		pParticles->addAttribute("pointScale");
 
@@ -761,7 +761,8 @@ public:
 		}
 		// Draw Particles
 
-		M = mat4(1.0);
+		M = translate(mat4(1.0), vec3(-1.3, -1.3, 0)) * scale(mat4(1.0), vec3(0.07));
+		glDisable(GL_DEPTH_TEST);
 		pParticles->bind();
 		glUniformMatrix4fv(pParticles->getUniform("P"), 1, GL_FALSE, &P_Ortho[0][0]);
 		glUniformMatrix4fv(pParticles->getUniform("V"), 1, GL_FALSE, &V[0][0]);
@@ -770,8 +771,9 @@ public:
 		glBindVertexArray(VertexArrayID);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, TextureParticle);
-		glDrawArrays(GL_POINTS, 0, 3);
+		glDrawArrays(GL_POINTS, 0, 4);
 		pParticles->unbind();
+		glEnable(GL_DEPTH_TEST);
 
 		// Draw the planets
 		for (auto &planet : planets)
@@ -787,6 +789,7 @@ public:
 			glUniformMatrix4fv(pMesh->getUniform("P"), 1, GL_FALSE, &P[0][0]);
 			glUniformMatrix4fv(pMesh->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 			glUniformMatrix4fv(pMesh->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+			glUniform1f(pMesh->getUniform("opacity"), 1.0);
 			glUniform3fv(pMesh->getUniform("campos"), 1, &mycam.pos[0]);
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, Texture2);

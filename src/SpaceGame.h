@@ -29,6 +29,18 @@ public:
     void update(double time);
 };
 
+class Particle
+{
+public:
+    float scale, lifetime, life;
+    vec3 position, velocity;
+
+    Particle();
+    Particle(vec3 pos, vec3 vel);
+    bool update(float dt);
+    void respawn(vec3 pos, vec3 vel);
+};
+
 class Asteroid
 {
 public:
@@ -65,9 +77,10 @@ public:
     int points;
     mat4 rotMat;
     Planet *destination;
+    vector<Particle> exhaust;
     double time_left = 30.0;
     void update(vec2 mousePos, double dt);
-    void updatePos(vec2 mousePos);
+    void updatePos(vec2 mousePos, double dt);
     bool intersects(Asteroid &asteroid);
     bool intersects(Planet &planet);
     void chooseNewDestination(vector<Planet> &planets);

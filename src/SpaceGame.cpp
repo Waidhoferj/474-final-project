@@ -3,7 +3,7 @@
 void PlayerShip::update(vec2 mousePos, double dt)
 {
     if (state == Flying || state == Delivering)
-        updatePos(mousePos);
+        updatePos(mousePos, dt);
     time_left -= dt;
     if (time_left < 0.0)
     {
@@ -15,9 +15,11 @@ void PlayerShip::update(vec2 mousePos, double dt)
     {
         state = Delivering;
     }
+
+    // draw
 }
 
-void PlayerShip::updatePos(vec2 mousePos)
+void PlayerShip::updatePos(vec2 mousePos, double dt)
 {
     vec2 mouseDif = mousePos - vec2(0.5);
     static vec2 smoothDif = mouseDif;
@@ -34,7 +36,24 @@ void PlayerShip::updatePos(vec2 mousePos)
     static vec3 shipPos = vec3(0.0);
     vec3 smoothAngles = eulerAngles(smoothDir);
     vec3 shipDir = vec3(cos(smoothDif.x < 0 ? acos(0) * 2 - smoothAngles.y : smoothAngles.y), 0, -sin(smoothAngles.y));
-    pos += shipDir * spd * vec3(smoothSpdFact);
+    vec3 v = shipDir * spd * vec3(smoothSpdFact);
+    pos += v;
+
+    // draw particles
+    static int part_counter = 0;
+    part_counter++;
+    if (exhaust.size() < 30 && part_counter > 200)
+    {
+        part_counter = 0;
+        exhaust.push_back(Particle(pos, -v));
+    }
+
+    for (auto &p : exhaust)
+    {
+        bool shouldRespawn = p.update(dt);
+        if (shouldRespawn)
+            p.respawn(pos, -v);
+    }
 }
 
 void PlayerShip::chooseNewDestination(vector<Planet> &planets)
@@ -113,4 +132,37 @@ void Asteroid::update(double time)
     vec3 cur_point = path[point_index];
     vec3 next_point = path[point_index + 1];
     pos = cur_point * glm::vec3(1.0 - interp_t) + next_point * glm::vec3(interp_t);
+}
+
+Particle::Particle()
+{
+    scale = 1.0;
+    position = vec3(0, 0, 0);
+    life = lifetime = 3.0;
+    velocity = vec3(0);
+}
+Particle::Particle(vec3 pos, vec3 vel)
+{
+    scale = 1.0;
+    position = vec3(0, 0, 0);
+    life = lifetime = 3.0;
+    velocity = vel;
+}
+
+void Particle::respawn(vec3 pos, vec3 vel)
+{
+    position = pos;
+    velocity = vel;
+    life = lifetime;
+}
+
+bool Particle::update(float dt)
+{
+    life -= dt;
+    if (life <= 0.0)
+        return true;
+    vec3 drag = normalize(velocity) * vec3(0.05);
+    velocity -= drag;
+    position += velocity;
+    return false;
 }

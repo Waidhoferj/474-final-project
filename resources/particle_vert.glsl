@@ -19,8 +19,8 @@ void main()
 	M0[1] = vec4(0.0, 1.0, 0.0, 0.0);
 	M0[2] = vec4(0.0, 0.0, 1.0, 0.0);
 
-	gl_Position = P *V* M0 * vec4(pointPos.xyz, 1.0);
-	gl_PointSize= pointScale;
+	gl_Position = P *V* M0 * vec4(pointPos, 1.0);
+	gl_PointSize= 20;
 
 	partScale = pointScale;
 }
