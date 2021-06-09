@@ -1,12 +1,13 @@
 #version 410 core
 
-layout(location = 0) position;
-layout(location = 1) color;
+layout(location = 0) in vec3 pointPos;
+layout(location = 1) in float pointScale;
 uniform mat4 P;
 uniform mat4 M;
 uniform mat4 V;
+uniform vec3 pointColor;
 
-out vec4 partCol;
+out float partScale;
 
 
 void main()
@@ -18,8 +19,8 @@ void main()
 	M0[1] = vec4(0.0, 1.0, 0.0, 0.0);
 	M0[2] = vec4(0.0, 0.0, 1.0, 0.0);
 
-	gl_Position = P *V* M0 * vec4(position.xyz, 1.0);
-	gl_PointSize= scale;
+	gl_Position = P *V* M0 * vec4(pointPos.xyz, 1.0);
+	gl_PointSize= pointScale;
 
-	partCol = color;
+	partScale = pointScale;
 }

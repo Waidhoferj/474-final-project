@@ -93,13 +93,13 @@ public:
 	WindowManager *windowManager = nullptr;
 
 	// Our shader program
-	std::shared_ptr<Program> prog, pBilboard, pTile, psky, pMesh, pWaypoint, pNumbers;
+	std::shared_ptr<Program> prog, pBilboard, pTile, psky, pMesh, pWaypoint, pNumbers, pParticles;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID;
 
 	// Data necessary to give our box to OpenGL
-	GLuint VertexBufferID, VertexNormDBox, VertexTexBox, IndexBufferIDBox;
+	GLuint PointPositionsID, PointScaleID, VertexTexBox, IndexBufferIDBox;
 
 	//texture data
 	GLuint Texture;
@@ -108,6 +108,7 @@ public:
 	GLuint Texture4;
 	GLuint TextureDeliveries;
 	GLuint TextureTimeLeft;
+	GLuint TextureParticle;
 
 	double total_time = 0.0;
 
@@ -198,7 +199,7 @@ public:
 			newPt[1] = 0;
 
 			std::cout << "converted:" << newPt[0] << " " << newPt[1] << std::endl;
-			glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
+			glBindBuffer(GL_ARRAY_BUFFER, PointPositionsID);
 			//update the vertex array with the updated points
 			glBufferSubData(GL_ARRAY_BUFFER, sizeof(float) * 6, sizeof(float) * 2, newPt);
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -304,22 +305,26 @@ public:
 		glBindVertexArray(VertexArrayID);
 
 		//generate vertex buffer to hand off to OGL
-		glGenBuffers(1, &VertexBufferID);
+		glGenBuffers(1, &PointPositionsID);
 		//set the current state to focus on our vertex buffer
-		glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
+		glBindBuffer(GL_ARRAY_BUFFER, PointPositionsID);
 
-		GLfloat cube_vertices[] = {
-			// front
-			-1.0, -1.0, 1.0, //LD
-			1.0, -1.0, 1.0,	 //RD
-			1.0, 1.0, 1.0,	 //RU
-			-1.0, 1.0, 1.0,	 //LU
+		GLfloat pointPositions[] = {
+			-1.0,
+			-1.0,
+			1.0,
+			1.0,
+			-1.0,
+			1.0,
+			1.0,
+			1.0,
+			1.0,
+			-1.0,
+			1.0,
+			1.0,
 		};
-		//make it a bit smaller
-		for (int i = 0; i < 12; i++)
-			cube_vertices[i] *= 0.5;
 		//actually memcopy the data - only do this once
-		glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_DYNAMIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(pointPositions), pointPositions, GL_DYNAMIC_DRAW);
 
 		//we need to set up the vertex array
 		glEnableVertexAttribArray(0);
@@ -327,59 +332,18 @@ public:
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
 
 		//color
-		GLfloat cube_norm[] = {
-			// front colors
-			0.0,
-			0.0,
+		GLfloat pointScale[] = {
+			0.5,
+			0.7,
+			0.9,
 			1.0,
-			0.0,
-			0.0,
-			1.0,
-			0.0,
-			0.0,
-			1.0,
-			0.0,
-			0.0,
-			1.0,
-
 		};
-		glGenBuffers(1, &VertexNormDBox);
+		glGenBuffers(1, &PointScaleID);
 		//set the current state to focus on our vertex buffer
-		glBindBuffer(GL_ARRAY_BUFFER, VertexNormDBox);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(cube_norm), cube_norm, GL_STATIC_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, PointScaleID);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(pointScale), pointScale, GL_DYNAMIC_DRAW);
 		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
-
-		//color
-		glm::vec2 cube_tex[] = {
-			// front colors
-			glm::vec2(0.0, 1.0),
-			glm::vec2(1.0, 1.0),
-			glm::vec2(1.0, 0.0),
-			glm::vec2(0.0, 0.0),
-
-		};
-		glGenBuffers(1, &VertexTexBox);
-		//set the current state to focus on our vertex buffer
-		glBindBuffer(GL_ARRAY_BUFFER, VertexTexBox);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(cube_tex), cube_tex, GL_STATIC_DRAW);
-		glEnableVertexAttribArray(2);
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
-
-		glGenBuffers(1, &IndexBufferIDBox);
-		//set the current state to focus on our vertex buffer
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBufferIDBox);
-		GLushort cube_elements[] = {
-
-			// front
-			0,
-			1,
-			2,
-			2,
-			3,
-			0,
-		};
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cube_elements), cube_elements, GL_STATIC_DRAW);
+		glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 0, (void *)0);
 
 		glBindVertexArray(0);
 
@@ -465,6 +429,19 @@ public:
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		glGenerateMipmap(GL_TEXTURE_2D);
 
+		str = resourceDirectory + "/alpha.bmp";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &TextureParticle);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, TextureParticle);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
 		//[TWOTEXTURES]
 		//set the 2 textures to the correct samplers in the fragment shader:
 		GLuint Tex1Location = glGetUniformLocation(prog->pid, "tex"); //tex, tex2... sampler in the fragment shader
@@ -488,7 +465,6 @@ public:
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		// Enable z-buffer test.
 		glEnable(GL_DEPTH_TEST);
-		//glDisable(GL_DEPTH_TEST);
 		// Initialize the GLSL program.
 		prog = std::make_shared<Program>();
 		prog->setVerbose(true);
@@ -539,6 +515,22 @@ public:
 		pNumbers->addAttribute("vertPos");
 		pNumbers->addAttribute("vertNor");
 		pNumbers->addAttribute("vertTex");
+
+		pParticles = std::make_shared<Program>();
+		pParticles->setVerbose(true);
+		pParticles->setShaderNames(resourceDirectory + "/particle_vert.glsl", resourceDirectory + "/particle_frag.glsl");
+		if (!pParticles->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		pParticles->addUniform("P");
+		pParticles->addUniform("V");
+		pParticles->addUniform("M");
+		pParticles->addUniform("pointColor");
+		pParticles->addUniform("campos");
+		pParticles->addAttribute("pointPos");
+		pParticles->addAttribute("pointScale");
 
 		pWaypoint = std::make_shared<Program>();
 		pWaypoint->setVerbose(true);
@@ -767,6 +759,19 @@ public:
 			if (ship.state == Delivering)
 				anim_time += frametime;
 		}
+		// Draw Particles
+
+		M = mat4(1.0);
+		pParticles->bind();
+		glUniformMatrix4fv(pParticles->getUniform("P"), 1, GL_FALSE, &P_Ortho[0][0]);
+		glUniformMatrix4fv(pParticles->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		glUniformMatrix4fv(pParticles->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glUniform3fv(pParticles->getUniform("campos"), 1, &mycam.pos[0]);
+		glBindVertexArray(VertexArrayID);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, TextureParticle);
+		glDrawArrays(GL_POINTS, 0, 3);
+		pParticles->unbind();
 
 		// Draw the planets
 		for (auto &planet : planets)

@@ -3,16 +3,16 @@ precision highp float;
 
 
 uniform sampler2D alphaTexture;
-
-in vec4 partCol;
+uniform vec3 pointColor = vec3(1,1,1);
+in float partScale;
 
 out vec4 outColor;
 
 
 void main()
 {
-	float alpha = texture(alphaTexture, gl_PointCoord).r * partCol.w;
+	float alpha = texture(alphaTexture, gl_PointCoord).r * partScale;
 	if(alpha < .1) discard;
 
-	outColor = vec4(partCol.xyz, alpha);
+	outColor = vec4(pointColor, alpha);
 }
