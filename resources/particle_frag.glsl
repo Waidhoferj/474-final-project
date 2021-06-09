@@ -1,19 +1,12 @@
-#version 330 core
-precision highp float;
-
-
-uniform sampler2D alphaTexture;
-uniform vec3 pointColor = vec3(1,1,1);
-in float partScale;
-
-out vec4 outColor;
-
+#version 410 core
+out vec4 color;
+in vec2 vertex_tex;
+uniform float opacity;
+uniform sampler2D tex;
 
 void main()
 {
-	float alpha = texture(alphaTexture, gl_PointCoord).r * partScale;
-	if(alpha < .1) discard;
-
-	outColor = texture(alphaTexture, gl_PointCoord);
-	//vec4(pointColor, alpha);
+vec4 tcol = texture(tex, vertex_tex) *  vec4(opacity);
+if(tcol.r < 0.1) discard;
+color = tcol;
 }

@@ -528,9 +528,10 @@ public:
 		pParticles->addUniform("P");
 		pParticles->addUniform("V");
 		pParticles->addUniform("M");
-		pParticles->addUniform("pointColor");
-		pParticles->addAttribute("pointPos");
-		pParticles->addAttribute("pointScale");
+		pParticles->addUniform("opacity");
+		pParticles->addAttribute("vertPos");
+		pParticles->addAttribute("vertNor");
+		pParticles->addAttribute("vertTex");
 
 		pWaypoint = std::make_shared<Program>();
 		pWaypoint->setVerbose(true);
@@ -725,7 +726,6 @@ public:
 			}
 			else if (anim_time > duration)
 			{
-				// Flip ship around
 				ship.state = Flying;
 				anim_time = 0.0;
 				ship.opacity = 1.0;
@@ -762,15 +762,16 @@ public:
 		// Draw Particles
 		for (auto &p : ship.exhaust)
 		{
-			M = glm::translate(mat4(1.0), ship.pos - p.position) * glm::scale(mat4(1), vec3(0.07));
-			pWaypoint->bind();
-			glUniformMatrix4fv(pWaypoint->getUniform("P"), 1, GL_FALSE, &P[0][0]);
-			glUniformMatrix4fv(pWaypoint->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-			glUniformMatrix4fv(pWaypoint->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-			glUniform4f(pWaypoint->getUniform("col"), 0.0f, 0.7f, 0.0f, 0.7f);
-			glUniform3fv(pWaypoint->getUniform("campos"), 1, &mycam.pos[0]);
-			sphere->draw(pWaypoint);
-			pWaypoint->unbind();
+			M = glm::translate(mat4(1.0), ship.pos - p.position) * glm::scale(mat4(1), vec3(0.1)) * glm::lookAt(vec3(0), mycam.pos, vec3(0, 1, 0));
+			pParticles->bind();
+			glUniformMatrix4fv(pParticles->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+			glUniformMatrix4fv(pParticles->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+			glUniformMatrix4fv(pParticles->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+			glUniform1f(pParticles->getUniform("opacity"), p.scale);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, TextureParticle);
+			plane->draw(pParticles);
+			pParticles->unbind();
 		}
 
 		// Draw the planets

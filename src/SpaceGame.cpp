@@ -15,8 +15,6 @@ void PlayerShip::update(vec2 mousePos, double dt)
     {
         state = Delivering;
     }
-
-    // draw
 }
 
 void PlayerShip::updatePos(vec2 mousePos, double dt)
