@@ -32,7 +32,7 @@ public:
 class Particle
 {
 public:
-    float scale, lifetime = 1.0, life;
+    float scale, lifetime = 0.7, life;
     vec3 position, velocity;
 
     Particle();

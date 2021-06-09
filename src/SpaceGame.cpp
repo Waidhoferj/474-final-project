@@ -40,8 +40,10 @@ void PlayerShip::updatePos(vec2 mousePos, double dt)
     // draw particles
     static int part_counter = 0;
     part_counter++;
-    vec3 exhaust_pos = pos - shipDir * vec3(0.8);
+    vec3 exhaust_pos = pos - shipDir * vec3(0.6);
+    float r = (float)rand() / (float)RAND_MAX;
     vec3 exhaust_vel = -v * vec3(1.5);
+    exhaust_vel.y += (r * 2.0f - 1.0f) * 0.08f * smoothSpdFact;
     if (exhaust.size() < 25 && part_counter > 10)
     {
         part_counter = 0;
@@ -159,6 +161,7 @@ void Particle::respawn(vec3 pos, vec3 vel)
 bool Particle::update(float dt)
 {
     life -= dt;
+    scale = life / lifetime;
     if (life <= 0.0)
         return true;
     position += velocity;

@@ -762,7 +762,7 @@ public:
 		// Draw Particles
 		for (auto &p : ship.exhaust)
 		{
-			M = glm::translate(mat4(1.0), ship.pos - p.position) * glm::scale(mat4(1), vec3(0.1)) * glm::lookAt(vec3(0), mycam.pos, vec3(0, 1, 0));
+			M = glm::translate(mat4(1.0), ship.pos - p.position) * glm::scale(mat4(1), vec3(0.13)) * glm::lookAt(vec3(0), mycam.pos, vec3(0, 1, 0));
 			pParticles->bind();
 			glUniformMatrix4fv(pParticles->getUniform("P"), 1, GL_FALSE, &P[0][0]);
 			glUniformMatrix4fv(pParticles->getUniform("V"), 1, GL_FALSE, &V[0][0]);
