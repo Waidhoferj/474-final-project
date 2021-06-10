@@ -110,6 +110,7 @@ public:
 	GLuint TextureDeliveries;
 	GLuint TextureTimeLeft;
 	GLuint TextureParticle;
+	vector<GLuint> TexturePlanets;
 
 	double total_time = 0.0;
 
@@ -276,11 +277,13 @@ public:
 		{
 			for (int i = 0; i < 5; i++)
 			{
-				line.push_back(vec3(1, 0, 0));
-				line.push_back(vec3(0, 0, 1));
-				line.push_back(vec3(-1, 0, 0));
-				line.push_back(vec3(0, 0, -1));
-				line.push_back(vec3(1, 0, 0));
+				double r1 = (double)rand() / (double)RAND_MAX * 0.5 + 1.0;
+				double r2 = (double)rand() / (double)RAND_MAX * 0.5 + 1.0;
+				line.push_back(vec3(r1, 0, 0));
+				line.push_back(vec3(0, 0, r2));
+				line.push_back(vec3(-r1, 0, 0));
+				line.push_back(vec3(0, 0, -r2));
+				line.push_back(vec3(r1, 0, 0));
 			}
 
 			for (auto &point : line)
@@ -429,6 +432,38 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		glGenerateMipmap(GL_TEXTURE_2D);
+
+		str = resourceDirectory + "/alpha.bmp";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &TextureParticle);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, TextureParticle);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		int num_planet_textures = 4;
+		TexturePlanets.resize(2);
+
+		for (int i = 0; i < num_planet_textures; i++)
+		{
+			str = resourceDirectory + "/p" + to_string(i + 1) + ".jpg";
+			strcpy(filepath, str.c_str());
+			data = stbi_load(filepath, &width, &height, &channels, 4);
+			glGenTextures(1, &TexturePlanets[i]);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, TexturePlanets[i]);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+			glGenerateMipmap(GL_TEXTURE_2D);
+		}
 
 		str = resourceDirectory + "/alpha.bmp";
 		strcpy(filepath, str.c_str());
@@ -775,6 +810,7 @@ public:
 		}
 
 		// Draw the planets
+		int p_i = 0;
 		for (auto &planet : planets)
 		{
 			planet.update(total_time);
@@ -791,9 +827,10 @@ public:
 			glUniform1f(pMesh->getUniform("opacity"), 1.0);
 			glUniform3fv(pMesh->getUniform("campos"), 1, &mycam.pos[0]);
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, Texture2);
+			glBindTexture(GL_TEXTURE_2D, TexturePlanets[p_i]);
 			sphere->draw(pMesh);
 			pMesh->unbind();
+			p_i = (p_i + 1) % TexturePlanets.size();
 		}
 
 		// Draw planet waypoint
