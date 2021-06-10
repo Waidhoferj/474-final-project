@@ -47,7 +47,9 @@ void PlayerShip::updatePos(vec2 mousePos, double dt)
     if (exhaust.size() < 25 && part_counter > 10)
     {
         part_counter = 0;
-        exhaust.push_back(Particle(exhaust_pos, exhaust_vel));
+        Particle p;
+        p.life = 0.0;
+        exhaust.push_back(p);
     }
 
     for (auto &p : exhaust)
