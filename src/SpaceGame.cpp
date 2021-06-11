@@ -44,7 +44,7 @@ void PlayerShip::updatePos(vec2 mousePos, double dt)
     float r = (float)rand() / (float)RAND_MAX;
     vec3 exhaust_vel = -v * vec3(1.5);
     exhaust_vel.y += (r * 2.0f - 1.0f) * 0.08f * smoothSpdFact;
-    if (exhaust.size() < 25 && part_counter > 10)
+    if (exhaust.size() < 50 && part_counter > 10)
     {
         part_counter = 0;
         Particle p;
